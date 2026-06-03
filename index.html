@@ -611,8 +611,7 @@ function renderOverview(){
   updateTopStatus();
   const yi = yearItems();
 
-  // setup banner
-  document.getElementById('setupBanner').innerHTML = '';
+
 
   // KPI
   let total=0,done=0,pend=0,abn=0,nt=0,nd=0;
@@ -686,8 +685,11 @@ function renderMatrix(){
   else if(fP==='overdue') items=items.filter(i=>isOverdue(i));
   else if(fP==='upcoming') items=items.filter(i=>isUpcoming(i,30));
 
+  const mwrap = document.querySelector('.mwrap');
+  if(!mwrap) return;
+
   if(!items.length||!G.depts.length){
-    document.getElementById('mTable').closest('.mwrap').innerHTML='<div style="padding:60px;text-align:center;color:var(--text3)">無符合條件的項目</div>';return;
+    mwrap.innerHTML='<div style="padding:60px;text-align:center;color:var(--text3)">無符合條件的項目</div>';return;
   }
 
   const submit=items.filter(i=>i.type!=='notice');
@@ -725,7 +727,7 @@ function renderMatrix(){
   html+=renderRows(submit, submit.length&&notice.length?'📋 繳交追蹤項目':'');
   html+=renderRows(notice, notice.length&&submit.length?'📢 公告配合項目':'');
   html+=`</tbody>`;
-  document.querySelector('.mwrap').innerHTML=`<table class="mtable" id="mTable">${html}</table>`;
+  mwrap.innerHTML=`<table class="mtable" id="mTable">${html}</table>`;
 }
 
 // ══════════════════════════════════════════
