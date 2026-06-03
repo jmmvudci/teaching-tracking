@@ -221,6 +221,7 @@ select{background:#fff;border:1px solid #e2e8f0;color:#2d3748;padding:6px 10px;b
 
 <div class="tabs">
   <button class="tab active" id="tab-overview" onclick="switchTab('overview',this)">📊 總覽</button>
+  <button class="tab" id="tab-deptprogress" onclick="switchTab('deptprogress',this)">📈 職類進度</button>
   <button class="tab" id="tab-matrix" onclick="switchTab('matrix',this)">🗂 追蹤矩陣</button>
   <button class="tab" id="tab-items" onclick="requireAdmin('items',this)">📝 項目管理 🔒</button>
   <button class="tab" id="tab-settings" onclick="requireAdmin('settings',this)">⚙️ 設定 🔒</button>
@@ -231,6 +232,11 @@ select{background:#fff;border:1px solid #e2e8f0;color:#2d3748;padding:6px 10px;b
 <!-- ══ OVERVIEW ══ -->
 <div class="panel active" id="panel-overview">
   <div id="overviewContent"></div>
+</div>
+
+<!-- ══ DEPT PROGRESS ══ -->
+<div class="panel" id="panel-deptprogress">
+  <div id="deptProgressContent"></div>
 </div>
 
 <!-- ══ MATRIX ══ -->
@@ -763,6 +769,7 @@ function switchTab(name, btn){
   document.getElementById('panel-'+name).classList.add('active');
   btn.classList.add('active');
   if(name==='overview') renderOverview();
+  if(name==='deptprogress') renderDeptProgress();
   if(name==='matrix') renderMatrix();
   if(name==='items') renderItems();
   if(name==='settings') renderSettings();
@@ -772,6 +779,7 @@ function changeYear(d){
   updateTopStatus(); saveLocal();
   const a=document.querySelector('.panel.active');
   if(a.id==='panel-overview') renderOverview();
+  if(a.id==='panel-deptprogress') renderDeptProgress();
   if(a.id==='panel-matrix') renderMatrix();
 }
 function updateTopStatus(){
@@ -844,22 +852,7 @@ function renderOverview(){
     <div class="alerts-col"><div class="alerts-col-title">🏥 醫事人員</div><div class="upcoming-list">${colGroups.medical.join('')||empty}</div></div>
   </div>`;
 
-  // dept progress
-  const drows = G.depts.map(dp=>{
-    let d=0,t=0;
-    for(const item of yi){
-      if(!item.depts.includes(dp))continue;
-      const periods=getItemPeriods(item);
-      for(const p of periods){ t++; if(sDone(getEff(item,dp,p.periodIdx)))d++; }
-    }
-    const p=t?Math.round(d/t*100):0;
-    const col=p>=80?'var(--green)':p>=40?'var(--warn)':'var(--red)';
-    return `<div class="dept-row">
-      <div class="dept-name" title="${dp}">${dp}</div>
-      <div class="prog-bg"><div class="prog-fill" style="width:${p}%;background:${col}"></div></div>
-      <div class="prog-pct">${p}%</div>
-    </div>`;
-  });
+  // dept progress (moved to separate tab - skip here)
 
   document.getElementById('overviewContent').innerHTML=`
     <div class="kpi-row">
@@ -869,11 +862,65 @@ function renderOverview(){
       <div class="kpi red"><div class="kpi-label">異常</div><div class="kpi-val">${abn}</div><div class="kpi-sub">需跟催</div></div>
       <div class="kpi orange"><div class="kpi-label">公告配合率</div><div class="kpi-val">${npct}%</div><div class="kpi-sub">${nd}/${nt} 格</div></div>
     </div>
-    <div class="grid2">
-      <div class="card"><div class="card-title"><span class="dot"></span>各職類完成進度</div>${drows.join('')||'<div style="color:var(--text3)">尚無職類</div>'}</div>
-      <div class="card"><div class="card-title"><span class="dot" style="background:#dd6b20"></span>即將到期 / 逾期項目</div>
-        ${alertsHtml}
+    <div class="card">
+      <div class="card-title"><span class="dot" style="background:#dd6b20"></span>追蹤或公告事項</div>
+      ${alertsHtml}
+    </div>`;
+}
+
+// ══════════════════════════════════════════
+//  DEPT PROGRESS
+// ══════════════════════════════════════════
+function renderDeptProgress(){
+  const yi=yearItems();
+  const cards=G.depts.map(dp=>{
+    // overall stats
+    let done=0, total=0;
+    const itemRows=[];
+    for(const item of yi){
+      if(!item.depts.includes(dp)) continue;
+      const periods=getItemPeriods(item);
+      for(const p of periods){
+        total++;
+        const s=getEff(item,dp,p.periodIdx);
+        const isDoneVal=sDone(s);
+        if(isDoneVal) done++;
+        const sLbl=sLabel(s); const sCls=sClass(s);
+        const pLabel=periods.length>1?` (${p.label})`:'';
+        const over=today()>p.dateEnd&&!isDoneVal;
+        itemRows.push(`<div style="display:flex;align-items:center;justify-content:space-between;padding:5px 0;border-bottom:1px solid #f7fafc;gap:8px;">
+          <div style="font-size:12px;color:#4a5568;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${item.name}${pLabel}">${item.name}${pLabel}</div>
+          <span class="spill ${sCls}" style="font-size:10px;padding:2px 7px;min-width:52px;">${sLbl}</span>
+        </div>`);
+      }
+    }
+    const pct=total?Math.round(done/total*100):0;
+    const barCol=pct>=80?'#38a169':pct>=40?'#dd6b20':'#e53e3e';
+    const overdueCount=yi.reduce((acc,item)=>{
+      if(!item.depts.includes(dp)) return acc;
+      return acc+getItemPeriods(item).filter(p=>today()>p.dateEnd&&!sDone(getEff(item,dp,p.periodIdx))).length;
+    },0);
+    return `<div class="card" style="break-inside:avoid;">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+        <div style="font-size:15px;font-weight:700;color:#1a202c;">${dp}</div>
+        <div style="display:flex;align-items:center;gap:8px;">
+          ${overdueCount>0?`<span style="font-size:11px;background:#fff5f5;color:#c53030;border:1px solid #fed7d7;padding:2px 8px;border-radius:99px;">${overdueCount} 逾期</span>`:''}
+          <span style="font-family:'DM Mono';font-size:18px;font-weight:700;color:${barCol};">${pct}%</span>
+        </div>
       </div>
+      <div style="background:#edf2f7;border-radius:4px;height:8px;margin-bottom:14px;">
+        <div style="width:${pct}%;background:${barCol};height:100%;border-radius:4px;transition:width .4s;"></div>
+      </div>
+      <div style="font-size:11px;color:#a0aec0;margin-bottom:10px;">${done} / ${total} 項完成</div>
+      <div style="max-height:200px;overflow-y:auto;">
+        ${itemRows.join('')||'<div style="color:#a0aec0;font-size:12px;text-align:center;padding:12px;">無追蹤項目</div>'}
+      </div>
+    </div>`;
+  });
+
+  document.getElementById('deptProgressContent').innerHTML=`
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:16px;">
+      ${cards.join('')}
     </div>`;
 }
 
