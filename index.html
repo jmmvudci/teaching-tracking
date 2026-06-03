@@ -1105,8 +1105,15 @@ function openPicker(e,itemId,dept,trackMode,isNotice,periodIdx=0){
   const sp=document.getElementById('spBox');
   sp.style.display='block'; document.getElementById('spOv').style.display='block';
   const r=e.currentTarget.getBoundingClientRect();
-  sp.style.top=(r.bottom+4+scrollY)+'px';
-  sp.style.left=Math.min(r.left,innerWidth-200)+'px';
+  const spH=sp.offsetHeight||180;
+  const spW=sp.offsetWidth||200;
+  // 判斷下方空間是否足夠
+  const belowSpace=window.innerHeight-r.bottom;
+  const topPos=belowSpace>=spH+8
+    ? r.bottom+scrollY+4          // 下方放得下 → 往下
+    : r.top+scrollY-spH-4;        // 下方不夠 → 往上
+  sp.style.top=topPos+'px';
+  sp.style.left=Math.min(Math.max(r.left,8),window.innerWidth-spW-8)+'px';
 }
 function closePicker(){ document.getElementById('spBox').style.display='none'; document.getElementById('spOv').style.display='none'; _pc=null; }
 function setStatus(s){
