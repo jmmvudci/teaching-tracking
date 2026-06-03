@@ -324,11 +324,11 @@ select{background:var(--surface2);border:1px solid var(--border);color:var(--tex
   <div class="ssec">
     <h4>圖例說明</h4>
     <div style="display:flex;flex-direction:column;gap:8px;">
-      <div style="display:flex;align-items:center;gap:12px;"><span class="spill s0">未完成</span><span style="color:var(--text2);font-size:13px">尚未繳交或填寫</span></div>
-      <div style="display:flex;align-items:center;gap:12px;"><span class="spill s1">已繳數據</span><span style="color:var(--text2);font-size:13px">數字/統計已填寫</span></div>
-      <div style="display:flex;align-items:center;gap:12px;"><span class="spill s2">已繳資料</span><span style="color:var(--text2);font-size:13px">文件/檔案已繳交</span></div>
+      <div style="display:flex;align-items:center;gap:12px;"><span class="spill s0">未完成</span><span style="color:var(--text2);font-size:13px">尚未完成</span></div>
+      <div style="display:flex;align-items:center;gap:12px;"><span class="spill s2">已完成</span><span style="color:var(--text2);font-size:13px">模式一：手動標記完成</span></div>
+      <div style="display:flex;align-items:center;gap:12px;"><span class="spill s2">6/15 完成</span><span style="color:var(--text2);font-size:13px">模式二：填入完成日期</span></div>
+      <div style="display:flex;align-items:center;gap:12px;"><span class="spill s4">逾期未完成</span><span style="color:var(--text2);font-size:13px">過截止日自動標示</span></div>
       <div style="display:flex;align-items:center;gap:12px;"><span class="spill s3">待確認</span><span style="color:var(--text2);font-size:13px">已收到，待確認</span></div>
-      <div style="display:flex;align-items:center;gap:12px;"><span class="spill s4">異常</span><span style="color:var(--text2);font-size:13px">資料異常或無法執行</span></div>
       <div style="display:flex;align-items:center;gap:12px;"><span class="spill s5">已配合</span><span style="color:var(--text2);font-size:13px">公告事項已配合完成</span></div>
     </div>
   </div>
@@ -365,6 +365,14 @@ select{background:var(--surface2);border:1px solid var(--border);color:var(--tex
         <input class="fi" id="fEnd" type="date">
         <div class="hint">最終截止/配合期限</div>
       </div>
+    </div>
+    <div class="fg" id="trackModeSection">
+      <label class="flabel">追蹤模式</label>
+      <select class="fi" id="fTrackMode">
+        <option value="simple">模式一：簡單勾選（未完成／已完成）</option>
+        <option value="date">模式二：填完成日期</option>
+      </select>
+      <div class="hint">逾期未完成皆自動標示；公告配合類型不適用此設定</div>
     </div>
     <div class="fg">
       <label class="flabel">是否為臨時項目</label>
@@ -429,10 +437,58 @@ const DEFAULT_DEPTS = [
   '醫事放射師','醫師檢驗師','護理師','營養師',
   '呼吸治療師','物理治療師','職能治療師','臨床心理師'
 ];
-const SL = ['未完成','已繳數據','已繳資料','待確認','異常','已配合'];
-const S_SUBMIT = [0,1,2,3,4];
+// statusMap value:
+//   0 = 未完成, 'done' = 已完成(模式一), 'YYYY-MM-DD' = 完成日期(模式二)
+//   'overdue' = 逾期未完成(自動), 5 = 已配合(公告), 3 = 待確認, 4 = 異常
 const S_NOTICE = [0,5,3,4];
 const TYPE_LABEL = {data:'📊 數據',file:'📁 資料',notice:'📢 公告'};
+
+// get effective status for a cell, auto-applying overdue
+function getEffectiveStatus(item, dept){
+  const raw = G.statusMap[sk(item.id, dept)];
+  // already overdue marker
+  if(raw === 'overdue') return 'overdue';
+  // completed states - never auto-overdue
+  if(raw === 'done' || (typeof raw === 'string' && raw.match(/^\d{4}-\d{2}-\d{2}$/))) return raw;
+  if(raw === 5 || raw === 3 || raw === 4) return raw;
+  // check auto-overdue: past deadline and not completed
+  if(item.type !== 'notice' && isOverdue(item)){
+    return 'overdue';
+  }
+  return raw ?? 0;
+}
+
+function statusLabel(item, dept){
+  const s = getEffectiveStatus(item, dept);
+  if(s === 0) return '未完成';
+  if(s === 'done') return '已完成';
+  if(s === 'overdue') return '逾期未完成';
+  if(s === 5) return '已配合';
+  if(s === 3) return '待確認';
+  if(s === 4) return '異常';
+  if(typeof s === 'string' && s.match(/^\d{4}-\d{2}-\d{2}$/)){
+    const dt = new Date(s+'T00:00:00');
+    return `${dt.getMonth()+1}/${dt.getDate()} 完成`;
+  }
+  return '未完成';
+}
+
+function statusClass(item, dept){
+  const s = getEffectiveStatus(item, dept);
+  if(s === 0) return 's0';
+  if(s === 'done') return 's2';
+  if(s === 'overdue') return 's4';
+  if(s === 5) return 's5';
+  if(s === 3) return 's3';
+  if(s === 4) return 's4';
+  if(typeof s === 'string' && s.match(/^\d{4}-\d{2}-\d{2}$/)) return 's2';
+  return 's0';
+}
+
+function isDone(item, dept){
+  const s = getEffectiveStatus(item, dept);
+  return s === 'done' || s === 5 || (typeof s === 'string' && s.match(/^\d{4}-\d{2}-\d{2}$/));
+}
 
 // ══════════════════════════════════════════
 //  STATE
@@ -568,7 +624,7 @@ function isActive(i){ const t=today(); return i.dateStart<=t && t<=i.dateEnd; }
 function isOverdue(i){ return today()>i.dateEnd; }
 function isUpcoming(i,days=30){ return i.dateStart>today() && daysDiff(i.dateStart)<=days; }
 function yearItems(){ const y=String(G.year); return G.items.filter(i=>(i.dateStart||'').startsWith(y)||(i.dateEnd||'').startsWith(y)); }
-function doneCount(item){ let d=0; for(const dp of item.depts){ const s=gs(item.id,dp); if(s===1||s===2||s===5)d++; } return {done:d,total:item.depts.length}; }
+function doneCount(item){ let d=0; for(const dp of item.depts){ if(isDone(item,dp))d++; } return {done:d,total:item.depts.length}; }
 
 function markDirty(){
   G.dirty=true;
@@ -616,9 +672,9 @@ function renderOverview(){
   // KPI
   let total=0,done=0,pend=0,abn=0,nt=0,nd=0;
   for(const item of yi) for(const dp of item.depts){
-    const s=gs(item.id,dp);
+    const s=getEffectiveStatus(item,dp);
     if(item.type==='notice'){ nt++; if(s===5)nd++; }
-    else{ total++; if(s===1||s===2)done++; else if(s===3)pend++; else if(s===4)abn++; }
+    else{ total++; if(isDone(item,dp))done++; else if(s===3)pend++; else if(s===4||s==='overdue')abn++; }
   }
   const pct=total?Math.round(done/total*100):0;
   const npct=nt?Math.round(nd/nt*100):0;
@@ -648,7 +704,7 @@ function renderOverview(){
   // dept progress
   const drows = G.depts.map(dp=>{
     let d=0,t=0;
-    for(const item of yi){ if(!item.depts.includes(dp))continue; t++; const s=gs(item.id,dp); if(s===1||s===2||s===5)d++; }
+    for(const item of yi){ if(!item.depts.includes(dp))continue; t++; if(isDone(item,dp))d++; }
     const p=t?Math.round(d/t*100):0;
     const col=p>=80?'var(--green)':p>=40?'var(--warn)':'var(--red)';
     return `<div class="dept-row">
@@ -717,10 +773,15 @@ function renderMatrix(){
       </td>`;
       for(const dp of G.depts){
         if(!item.depts.includes(dp)){r+=`<td class="nacell">—</td>`;continue;}
-        const s=gs(item.id,dp);
-        if(fS!=='all'&&String(s)!==fS){r+=`<td class="nacell">—</td>`;continue;}
-        r+=`<td class="scell" onclick="openPicker(event,'${item.id}','${dp}',${item.type==='notice'})">
-          <span class="spill s${s}">${SL[s]}</span></td>`;
+        const sLbl=statusLabel(item,dp);
+        const sCls=statusClass(item,dp);
+        const sVal=getEffectiveStatus(item,dp);
+        if(fS!=='all'){
+          const matched=(fS==='0'&&sVal===0)||(fS==='done'&&sVal==='done')||(fS==='overdue'&&sVal==='overdue')||(fS==='5'&&sVal===5)||(fS==='3'&&sVal===3)||(fS==='4'&&(sVal===4||sVal==='overdue'));
+          if(!matched){r+=`<td class="nacell">—</td>`;continue;}
+        }
+        r+=`<td class="scell" onclick="openPicker(event,'${item.id}','${dp}','${item.trackMode||'simple'}',${item.type==='notice'})">
+          <span class="spill ${sCls}">${sLbl}</span></td>`;
       }
       r+=`</tr>`;
     }
@@ -736,23 +797,48 @@ function renderMatrix(){
 //  STATUS PICKER
 // ══════════════════════════════════════════
 let _pc=null;
-function openPicker(e,itemId,dept,isNotice){
-  e.stopPropagation(); _pc={itemId,dept};
-  const opts=isNotice?S_NOTICE:S_SUBMIT;
-  document.getElementById('spOpts').innerHTML=opts.map(s=>
-    `<div class="sp-item" onclick="setStatus(${s})"><span class="spill s${s}">${SL[s]}</span></div>`).join('');
+function openPicker(e,itemId,dept,trackMode,isNotice){
+  e.stopPropagation(); _pc={itemId,dept,trackMode};
+  let html='';
+  if(isNotice){
+    html=S_NOTICE.map(s=>{
+      const lbl={0:'未完成',3:'待確認',4:'異常',5:'已配合'}[s]||'';
+      return `<div class="sp-item" onclick="setStatus(${s})"><span class="spill s${s}">${lbl}</span></div>`;
+    }).join('');
+  } else if(trackMode==='date'){
+    html=`
+      <div class="sp-item" onclick="setStatus(0)"><span class="spill s0">未完成</span></div>
+      <div style="padding:8px 10px;">
+        <div style="font-size:11px;color:var(--text2);margin-bottom:5px;">填入完成日期</div>
+        <div style="display:flex;gap:6px;align-items:center;">
+          <input type="date" id="spDateInput" style="background:var(--surface3);border:1px solid var(--border);color:var(--text);padding:4px 8px;border-radius:var(--r-sm);font-size:12px;flex:1;" value="${new Date().toISOString().slice(0,10)}">
+          <button onclick="setStatus('DATE')" style="background:var(--accent);color:#fff;border:none;padding:4px 10px;border-radius:var(--r-sm);cursor:pointer;font-size:12px;">確認</button>
+        </div>
+      </div>`;
+  } else {
+    html=`
+      <div class="sp-item" onclick="setStatus(0)"><span class="spill s0">未完成</span></div>
+      <div class="sp-item" onclick="setStatus('done')"><span class="spill s2">已完成</span></div>`;
+  }
+  document.getElementById('spOpts').innerHTML=html;
   const sp=document.getElementById('spBox');
   sp.style.display='block'; document.getElementById('spOv').style.display='block';
   const r=e.currentTarget.getBoundingClientRect();
   sp.style.top=(r.bottom+4+scrollY)+'px';
-  sp.style.left=Math.min(r.left,innerWidth-170)+'px';
+  sp.style.left=Math.min(r.left,innerWidth-200)+'px';
 }
 function closePicker(){ document.getElementById('spBox').style.display='none'; document.getElementById('spOv').style.display='none'; _pc=null; }
 function setStatus(s){
   if(!_pc)return;
-  G.statusMap[sk(_pc.itemId,_pc.dept)]=s;
+  let val=s;
+  if(s==='DATE'){
+    val=document.getElementById('spDateInput').value;
+    if(!val){toast('請選擇日期');return;}
+  }
+  G.statusMap[sk(_pc.itemId,_pc.dept)]=val;
   markDirty(); closePicker(); renderMatrix(); renderOverview();
-  toast(`已更新為「${SL[s]}」`);
+  const lbl=val===0?'未完成':val==='done'?'已完成':val===5?'已配合':val===3?'待確認':val===4?'異常':`${val} 完成`;
+  toast(`已更新為「${lbl}」`);
 }
 
 // ══════════════════════════════════════════
@@ -761,7 +847,7 @@ function setStatus(s){
 function renderItems(){
   const submit=G.items.filter(i=>i.type!=='notice');
   const notice=G.items.filter(i=>i.type==='notice');
-  let html=`<div class="items-hdr"><h3 style="font-size:15px;font-weight:600;">追蹤項目管理</h3><button class="btn pri" onclick="openItemModal()">＋ 新增項目</button></div>`;
+  let html='';
   const sec=(arr,label)=>{
     if(!arr.length)return '';
     return `<div><div class="sec-title">${label}</div><div class="ilist">
@@ -798,6 +884,7 @@ function openItemModal(id=null){
     const item=G.items.find(i=>i.id===id); if(!item)return;
     document.getElementById('fName').value=item.name;
     document.getElementById('fType2').value=item.type;
+    document.getElementById('fTrackMode').value=item.trackMode||'simple';
     document.getElementById('fTemp').value=item.temp?'1':'0';
     document.getElementById('fStart').value=item.dateStart||'';
     document.getElementById('fEnd').value=item.dateEnd||'';
@@ -824,7 +911,7 @@ function saveItem(){
   if(ds>de){toast('截止日期需晚於開始日期');return;}
   const depts=[...document.querySelectorAll('#deptCbs input:checked')].map(el=>el.value);
   if(!depts.length){toast('請選擇適用職類');return;}
-  const data={name,type:document.getElementById('fType2').value,temp:document.getElementById('fTemp').value==='1',dateStart:ds,dateEnd:de,depts,note:document.getElementById('fNote').value.trim()};
+  const data={name,type:document.getElementById('fType2').value,trackMode:document.getElementById('fTrackMode').value,temp:document.getElementById('fTemp').value==='1',dateStart:ds,dateEnd:de,depts,note:document.getElementById('fNote').value.trim()};
   if(G.editId){ const idx=G.items.findIndex(i=>i.id===G.editId); if(idx>=0)G.items[idx]={...G.items[idx],...data}; toast('已更新'); }
   else{ G.items.push({id:genId(),...data}); toast('已新增'); }
   markDirty(); closeModal(); renderItems();
@@ -914,7 +1001,7 @@ function buildExcel(){
     const base = [item.name, typeLabel, item.temp?'是':'否', item.dateStart, item.dateEnd, item.note||''];
     const dCols = depts.map(dp => {
       if(!item.depts.includes(dp)) return '—';
-      return SL[gs(item.id,dp)];
+      return statusLabel(item, dp);
     });
     rows.push([...base,...dCols]);
   }
@@ -923,10 +1010,11 @@ function buildExcel(){
   XLSX.utils.book_append_sheet(wb, ws1, '追蹤矩陣');
 
   // Sheet2: 項目設定
-  const hdr2 = ['#','項目名稱','類型','臨時','開始日期','截止日期','適用職類','備註'];
+  const hdr2 = ['#','項目名稱','類型','追蹤模式','臨時','開始日期','截止日期','適用職類','備註'];
   const rows2 = [hdr2, ...G.items.map((item,i)=>[
     i+1, item.name,
     {data:'填數據',file:'繳資料',notice:'公告配合'}[item.type],
+    item.type==='notice'?'公告':(item.trackMode==='date'?'填完成日期':'簡單勾選'),
     item.temp?'是':'否', item.dateStart, item.dateEnd,
     item.depts.join('、'), item.note||''
   ])];
@@ -1066,7 +1154,7 @@ function exportCSV(){
   const rows=[['項目名稱','類型','開始日期','截止日期','職類','狀態']];
   for(const item of G.items) for(const dp of item.depts){
     rows.push([item.name,{data:'填數據',file:'繳資料',notice:'公告配合'}[item.type],
-      item.dateStart,item.dateEnd,dp,SL[gs(item.id,dp)]]);
+      item.dateStart,item.dateEnd,dp,statusLabel(item,dp)]);
   }
   const csv=rows.map(r=>r.map(c=>`"${String(c).replace(/"/g,'""')}"`).join(',')).join('\n');
   const a=document.createElement('a');
