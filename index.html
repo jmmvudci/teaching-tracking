@@ -1,0 +1,1133 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>教學研究年度追蹤系統</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300;400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+:root{
+  --bg:#0d1117;--surface:#161b22;--surface2:#21262d;--surface3:#30363d;
+  --border:#30363d;--border2:#21262d;--text:#e6edf3;--text2:#8b949e;--text3:#484f58;
+  --accent:#58a6ff;--green:#3fb950;--red:#f78166;--purple:#d2a8ff;--warn:#e3b341;--orange:#f0883e;
+  --r-sm:6px;--r-md:10px;--r-lg:16px;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:'Noto Sans TC',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;font-size:14px;}
+
+/* TOPBAR */
+.topbar{display:flex;align-items:center;gap:16px;padding:0 24px;height:56px;background:var(--surface);border-bottom:1px solid var(--border);position:sticky;top:0;z-index:100;}
+.logo{font-size:15px;font-weight:700;color:var(--accent);white-space:nowrap;}
+.topbar-status{font-size:11px;color:var(--text3);font-family:'DM Mono';}
+.topbar-right{margin-left:auto;display:flex;align-items:center;gap:8px;}
+.sync-btn{padding:5px 14px;border-radius:var(--r-sm);border:1px solid var(--border);background:var(--surface2);color:var(--text2);cursor:pointer;font-size:12px;font-family:'Noto Sans TC';transition:all .15s;display:flex;align-items:center;gap:6px;}
+.sync-btn:hover{border-color:var(--accent);color:var(--accent);}
+.sync-btn.saving{border-color:var(--warn);color:var(--warn);}
+.sync-btn.ok{border-color:var(--green);color:var(--green);}
+.year-ctrl{display:flex;align-items:center;gap:6px;}
+.year-btn{background:var(--surface2);border:1px solid var(--border);color:var(--text2);padding:4px 10px;border-radius:var(--r-sm);cursor:pointer;font-family:'DM Mono';font-size:13px;}
+.year-btn:hover{border-color:var(--accent);color:var(--accent);}
+.year-val{font-family:'DM Mono';font-size:17px;font-weight:500;min-width:48px;text-align:center;}
+
+/* TABS */
+.tabs{display:flex;background:var(--surface);border-bottom:1px solid var(--border);padding:0 24px;overflow-x:auto;}
+.tab{padding:10px 18px;border:none;background:transparent;color:var(--text2);cursor:pointer;font-size:13px;font-family:'Noto Sans TC';font-weight:500;border-bottom:2px solid transparent;position:relative;top:1px;white-space:nowrap;transition:all .15s;}
+.tab:hover{color:var(--text);}
+.tab.active{color:var(--accent);border-bottom-color:var(--accent);}
+
+/* MAIN */
+.main{padding:24px;max-width:1500px;margin:0 auto;}
+.panel{display:none;}.panel.active{display:block;}
+
+/* SETUP BANNER */
+.setup-banner{background:#1c2430;border:1px solid var(--accent);border-radius:var(--r-lg);padding:24px;margin-bottom:24px;}
+.setup-banner h3{color:var(--accent);font-size:15px;margin-bottom:16px;}
+.setup-steps{display:flex;flex-direction:column;gap:12px;}
+.setup-step{display:flex;align-items:flex-start;gap:12px;}
+.step-num{width:24px;height:24px;border-radius:50%;background:var(--accent);color:#fff;font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px;}
+.step-body{flex:1;}
+.step-label{font-size:13px;font-weight:600;color:var(--text);margin-bottom:4px;}
+.step-desc{font-size:12px;color:var(--text2);}
+.setup-input-row{display:flex;gap:8px;margin-top:8px;flex-wrap:wrap;}
+.setup-input{background:var(--surface2);border:1px solid var(--border);color:var(--text);padding:7px 12px;border-radius:var(--r-sm);font-family:'DM Mono';font-size:13px;flex:1;min-width:200px;}
+.setup-input:focus{outline:none;border-color:var(--accent);}
+.step-status{font-size:11px;margin-top:4px;}
+.step-ok{color:var(--green);} .step-err{color:var(--red);}
+
+/* KPI */
+.kpi-row{display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin-bottom:20px;}
+.kpi{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);padding:20px;}
+.kpi-label{font-size:10px;color:var(--text3);letter-spacing:.08em;text-transform:uppercase;margin-bottom:8px;}
+.kpi-val{font-size:26px;font-weight:700;font-family:'DM Mono';}
+.kpi-sub{font-size:11px;color:var(--text2);margin-top:3px;}
+.kpi.blue .kpi-val{color:var(--accent);}.kpi.green .kpi-val{color:var(--green);}
+.kpi.red .kpi-val{color:var(--red);}.kpi.purple .kpi-val{color:var(--purple);}
+.kpi.orange .kpi-val{color:var(--orange);}
+
+/* CARDS */
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px;}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);padding:20px;}
+.card-title{font-size:13px;font-weight:600;margin-bottom:16px;display:flex;align-items:center;gap:8px;}
+.dot{width:6px;height:6px;border-radius:50%;background:var(--accent);flex-shrink:0;}
+
+/* DEPT PROGRESS */
+.dept-row{display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--border2);}
+.dept-row:last-child{border-bottom:none;}
+.dept-name{width:105px;font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex-shrink:0;}
+.prog-bg{flex:1;height:7px;background:var(--surface3);border-radius:4px;overflow:hidden;}
+.prog-fill{height:100%;border-radius:4px;transition:width .4s;}
+.prog-pct{width:34px;text-align:right;font-family:'DM Mono';font-size:11px;color:var(--text2);flex-shrink:0;}
+
+/* UPCOMING */
+.upcoming-list{display:flex;flex-direction:column;gap:8px;}
+.up-item{display:flex;align-items:flex-start;gap:10px;padding:10px;background:var(--surface2);border-radius:var(--r-md);border:1px solid var(--border);}
+.up-badge{flex-shrink:0;font-size:10px;padding:2px 8px;border-radius:99px;margin-top:2px;}
+.ub-submit{background:#1c2d40;color:var(--accent);}
+.ub-notice{background:#2d1e0f;color:var(--orange);}
+.ub-over{background:#2d1b1b;color:var(--red);}
+.up-name{font-size:13px;font-weight:500;flex:1;}
+.up-meta{font-size:11px;color:var(--text3);margin-top:2px;}
+.up-days{font-size:11px;font-weight:700;white-space:nowrap;flex-shrink:0;}
+.days-ok{color:var(--green);}.days-warn{color:var(--warn);}.days-over{color:var(--red);}
+
+/* MATRIX */
+.matrix-toolbar{display:flex;gap:8px;align-items:center;margin-bottom:12px;flex-wrap:wrap;}
+.tlabel{font-size:12px;color:var(--text3);}
+select{background:var(--surface2);border:1px solid var(--border);color:var(--text);padding:6px 10px;border-radius:var(--r-sm);font-family:'Noto Sans TC';font-size:13px;cursor:pointer;}
+.btn{padding:6px 14px;border-radius:var(--r-sm);border:1px solid var(--border);background:var(--surface2);color:var(--text2);cursor:pointer;font-family:'Noto Sans TC';font-size:13px;transition:all .15s;display:inline-flex;align-items:center;gap:6px;white-space:nowrap;}
+.btn:hover{border-color:var(--accent);color:var(--accent);}
+.btn.pri{background:var(--accent);color:#fff;border-color:var(--accent);}
+.btn.pri:hover{background:#79c0ff;}
+.btn.dng{border-color:var(--red);color:var(--red);}
+.btn.dng:hover{background:#2d1b1b;}
+
+.mwrap{overflow-x:auto;border-radius:var(--r-lg);border:1px solid var(--border);}
+.mtable{width:100%;border-collapse:collapse;min-width:700px;}
+.mtable th{background:var(--surface2);padding:8px 10px;font-size:11px;font-weight:600;color:var(--text3);letter-spacing:.05em;text-align:center;border:1px solid var(--border2);white-space:nowrap;}
+.mtable th.icol{text-align:left;min-width:220px;position:sticky;left:0;z-index:2;}
+.mtable td{padding:5px 7px;border:1px solid var(--border2);vertical-align:middle;}
+.mtable td.icell{background:var(--surface);min-width:220px;position:sticky;left:0;z-index:1;}
+.item-name{font-size:13px;font-weight:500;line-height:1.4;}
+.item-meta{font-size:10px;color:var(--text3);font-family:'DM Mono';margin-top:2px;}
+.tbadge{display:inline-block;font-size:10px;padding:1px 7px;border-radius:99px;margin-right:3px;}
+.tb-data{background:#1c2d40;color:var(--accent);}
+.tb-file{background:#1c2a1c;color:var(--green);}
+.tb-notice{background:#2d1e0f;color:var(--orange);}
+.tb-temp{background:#2a1c2a;color:var(--purple);}
+.scell{text-align:center;cursor:pointer;min-width:80px;}
+.spill{display:inline-flex;align-items:center;justify-content:center;padding:3px 8px;border-radius:99px;font-size:11px;font-weight:500;min-width:62px;transition:filter .15s;white-space:nowrap;}
+.s0{background:var(--surface3);color:var(--text3);}
+.s1{background:#1c2d40;color:var(--accent);}
+.s2{background:#1c2a1c;color:var(--green);}
+.s3{background:#2d2a1c;color:var(--warn);}
+.s4{background:#2d1b1b;color:var(--red);}
+.s5{background:#2d1e0f;color:var(--orange);}
+.scell:hover .spill{filter:brightness(1.3);}
+.nacell{text-align:center;color:var(--text3);font-size:12px;background:var(--bg);}
+.sec-hdr td{background:var(--surface3)!important;color:var(--text2);font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;padding:6px 10px!important;}
+
+/* ITEMS */
+.items-hdr{display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;}
+.sec-title{font-size:12px;font-weight:700;color:var(--text2);letter-spacing:.08em;text-transform:uppercase;margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid var(--border);}
+.ilist{display:flex;flex-direction:column;gap:8px;margin-bottom:24px;}
+.irow{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-md);padding:14px 16px;display:flex;align-items:flex-start;gap:16px;flex-wrap:wrap;}
+.irow.notice-row{border-color:#3d2a0f;}
+.iinfo{flex:1;min-width:200px;}
+.iname{font-size:14px;font-weight:600;margin-bottom:4px;}
+.imeta{font-size:12px;color:var(--text2);line-height:1.6;}
+
+/* MODAL */
+.overlay{position:fixed;inset:0;background:rgba(0,0,0,.75);display:flex;align-items:center;justify-content:center;z-index:200;backdrop-filter:blur(4px);}
+.overlay.h{display:none;}
+.modal{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);padding:28px;width:560px;max-width:96vw;max-height:92vh;overflow-y:auto;}
+.modal h3{font-size:16px;font-weight:700;margin-bottom:20px;}
+.fg{margin-bottom:14px;}
+.flabel{font-size:12px;color:var(--text2);margin-bottom:5px;display:block;}
+.fi{width:100%;background:var(--surface2);border:1px solid var(--border);color:var(--text);padding:8px 12px;border-radius:var(--r-sm);font-family:'Noto Sans TC';font-size:14px;}
+.fi:focus{outline:none;border-color:var(--accent);}
+.frow{display:flex;gap:8px;}.frow .fg{flex:1;}
+.cbgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:5px;}
+.cbi{display:flex;align-items:center;gap:5px;padding:5px 8px;border-radius:var(--r-sm);border:1px solid var(--border);background:var(--surface2);cursor:pointer;}
+.cbi:hover{border-color:var(--accent);}
+.cbi input{accent-color:var(--accent);cursor:pointer;}
+.cbi label{font-size:12px;color:var(--text2);cursor:pointer;}
+.mfooter{display:flex;justify-content:flex-end;gap:8px;margin-top:20px;}
+.hint{font-size:11px;color:var(--text3);margin-top:3px;}
+
+/* STATUS PICKER */
+.sp-overlay{position:fixed;inset:0;z-index:300;background:transparent;}
+.sp-box{position:fixed;background:var(--surface2);border:1px solid var(--border);border-radius:var(--r-md);padding:8px;z-index:301;min-width:150px;box-shadow:0 8px 32px rgba(0,0,0,.6);}
+.sp-item{display:flex;align-items:center;padding:7px 10px;cursor:pointer;border-radius:var(--r-sm);}
+.sp-item:hover{background:var(--surface3);}
+
+/* TOAST */
+.toast{position:fixed;bottom:24px;right:24px;z-index:999;background:var(--surface2);border:1px solid var(--border);padding:10px 18px;border-radius:var(--r-md);font-size:13px;transform:translateY(20px);opacity:0;transition:all .3s;pointer-events:none;}
+.toast.show{transform:translateY(0);opacity:1;}
+
+/* LOADING */
+.loading{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:80px 20px;gap:16px;color:var(--text3);}
+.spinner{width:32px;height:32px;border:3px solid var(--surface3);border-top-color:var(--accent);border-radius:50%;animation:spin .8s linear infinite;}
+@keyframes spin{to{transform:rotate(360deg);}}
+
+/* SETTINGS */
+.ssec{margin-bottom:28px;max-width:620px;}
+.ssec h4{font-size:12px;font-weight:700;color:var(--text2);letter-spacing:.08em;text-transform:uppercase;margin-bottom:12px;}
+.dept-tags{display:flex;flex-wrap:wrap;gap:8px;}
+.dtag{display:flex;align-items:center;gap:6px;background:var(--surface2);border:1px solid var(--border);border-radius:99px;padding:4px 12px;font-size:13px;}
+.dtag .rm{cursor:pointer;color:var(--text3);font-size:16px;line-height:1;}.dtag .rm:hover{color:var(--red);}
+.add-row{display:flex;gap:8px;margin-top:10px;}
+
+/* LOGIN MODAL */
+.login-overlay{position:fixed;inset:0;background:rgba(0,0,0,.85);display:flex;align-items:center;justify-content:center;z-index:500;backdrop-filter:blur(6px);}
+.login-overlay.h{display:none;}
+.login-box{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);padding:36px;width:360px;max-width:94vw;}
+.login-box .lock-icon{font-size:36px;text-align:center;margin-bottom:16px;}
+.login-box h3{font-size:16px;font-weight:700;text-align:center;margin-bottom:6px;}
+.login-box .login-sub{font-size:12px;color:var(--text3);text-align:center;margin-bottom:24px;}
+.login-err{font-size:12px;color:var(--red);text-align:center;margin-top:10px;min-height:18px;}
+.login-footer{display:flex;gap:8px;margin-top:20px;}
+.login-footer .btn{flex:1;justify-content:center;}
+/* admin badge */
+.admin-badge{display:inline-flex;align-items:center;gap:5px;background:#1c2d40;border:1px solid var(--accent);color:var(--accent);font-size:11px;padding:3px 10px;border-radius:99px;cursor:pointer;}
+.admin-badge:hover{background:#1f3550;}
+
+::-webkit-scrollbar{width:6px;height:6px;}
+::-webkit-scrollbar-track{background:var(--bg);}
+::-webkit-scrollbar-thumb{background:var(--surface3);border-radius:3px;}
+
+@media(max-width:800px){
+  .kpi-row{grid-template-columns:repeat(2,1fr);}
+  .grid2{grid-template-columns:1fr;}
+  .main,.topbar,.tabs{padding-left:12px;padding-right:12px;}
+}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="logo">📋 教學研究年度追蹤系統</div>
+  <div class="topbar-status" id="topStatus">載入中...</div>
+  <div class="topbar-right">
+    <div id="adminBadge" style="display:none;"></div>
+    <button class="sync-btn" id="syncBtn" onclick="syncToGitHub()">☁ 儲存至 GitHub</button>
+    <div class="year-ctrl">
+      <button class="year-btn" onclick="changeYear(-1)">◀</button>
+      <div class="year-val" id="yearVal">2025</div>
+      <button class="year-btn" onclick="changeYear(1)">▶</button>
+    </div>
+  </div>
+</div>
+
+<div class="tabs">
+  <button class="tab active" id="tab-overview" onclick="switchTab('overview',this)">📊 總覽</button>
+  <button class="tab" id="tab-matrix" onclick="switchTab('matrix',this)">🗂 追蹤矩陣</button>
+  <button class="tab" id="tab-items" onclick="requireAdmin('items',this)">📝 項目管理 🔒</button>
+  <button class="tab" id="tab-settings" onclick="requireAdmin('settings',this)">⚙️ 設定 🔒</button>
+</div>
+
+<div class="main">
+
+<!-- ══ OVERVIEW ══ -->
+<div class="panel active" id="panel-overview">
+  <div id="setupBanner"></div>
+  <div id="overviewContent"></div>
+</div>
+
+<!-- ══ MATRIX ══ -->
+<div class="panel" id="panel-matrix">
+  <div class="matrix-toolbar">
+    <span class="tlabel">類型</span>
+    <select id="fType" onchange="renderMatrix()">
+      <option value="all">全部</option>
+      <option value="data">📊 數據</option>
+      <option value="file">📁 資料</option>
+      <option value="notice">📢 公告</option>
+    </select>
+    <span class="tlabel">狀態</span>
+    <select id="fStatus" onchange="renderMatrix()">
+      <option value="all">全部</option>
+      <option value="0">未完成</option>
+      <option value="1">已繳數據</option>
+      <option value="2">已繳資料</option>
+      <option value="3">待確認</option>
+      <option value="4">異常</option>
+      <option value="5">已配合</option>
+    </select>
+    <span class="tlabel">時間</span>
+    <select id="fPeriod" onchange="renderMatrix()">
+      <option value="all">全年</option>
+      <option value="active">進行中</option>
+      <option value="overdue">已逾期</option>
+      <option value="upcoming">未來30天</option>
+    </select>
+    <div style="margin-left:auto;display:flex;gap:8px;">
+      <button class="btn" onclick="exportCSV()">⬇ 匯出 CSV</button>
+    </div>
+  </div>
+  <div class="mwrap"><table class="mtable" id="mTable"></table></div>
+</div>
+
+<!-- ══ ITEMS ══ -->
+<div class="panel" id="panel-items">
+  <div class="items-hdr">
+    <h3 style="font-size:15px;font-weight:600;">追蹤項目管理</h3>
+    <button class="btn pri" onclick="openItemModal()">＋ 新增項目</button>
+  </div>
+  <div id="itemsSections"></div>
+</div>
+
+<!-- ══ SETTINGS ══ -->
+<div class="panel" id="panel-settings">
+  <!-- 管理員帳密 -->
+  <div class="ssec">
+    <h4>🔐 管理員帳密設定</h4>
+    <div class="fg">
+      <label class="flabel">管理員帳號</label>
+      <input class="fi" id="cfgAdminUser" style="max-width:200px;" placeholder="admin">
+    </div>
+    <div class="frow" style="max-width:420px;">
+      <div class="fg">
+        <label class="flabel">新密碼</label>
+        <input class="fi" id="cfgAdminPass" type="password" placeholder="設定新密碼">
+      </div>
+      <div class="fg">
+        <label class="flabel">確認新密碼</label>
+        <input class="fi" id="cfgAdminPass2" type="password" placeholder="再次輸入">
+      </div>
+    </div>
+    <div class="hint" style="margin-bottom:8px;">留空表示不修改密碼</div>
+  </div>
+
+  <!-- GitHub 設定 -->
+  <div class="ssec">
+    <h4>🔗 GitHub 連線設定</h4>
+    <div class="fg">
+      <label class="flabel">GitHub 帳號（username）</label>
+      <input class="fi" id="cfgUser" style="max-width:300px;" placeholder="例：your-username">
+    </div>
+    <div class="fg">
+      <label class="flabel">Repository 名稱</label>
+      <input class="fi" id="cfgRepo" style="max-width:300px;" placeholder="例：teaching-tracking">
+    </div>
+    <div class="fg">
+      <label class="flabel">Excel 檔案路徑（在 repo 中的路徑）</label>
+      <input class="fi" id="cfgPath" style="max-width:300px;" placeholder="例：tracking_data.xlsx">
+    </div>
+    <div class="fg">
+      <label class="flabel">Personal Access Token（僅存在本機，不會上傳）</label>
+      <input class="fi" id="cfgToken" type="password" style="max-width:400px;" placeholder="ghp_xxxxxxxxxxxxxxxxxxxx">
+      <div class="hint">在 GitHub → Settings → Developer settings → Personal access tokens → Fine-grained tokens 產生，需勾選 Contents 讀寫權限</div>
+    </div>
+    <div style="display:flex;gap:8px;margin-top:8px;">
+      <button class="btn pri" onclick="saveConfig()">儲存設定</button>
+      <button class="btn" onclick="testConnection()">🔌 測試連線</button>
+    </div>
+    <div id="cfgStatus" style="margin-top:8px;font-size:12px;"></div>
+  </div>
+
+  <!-- 職類管理 -->
+  <div class="ssec">
+    <h4>職類管理</h4>
+    <div class="dept-tags" id="deptTags"></div>
+    <div class="add-row">
+      <input class="fi" id="newDept" placeholder="輸入職類名稱" style="max-width:180px;" onkeydown="if(event.key==='Enter')addDept()">
+      <button class="btn pri" onclick="addDept()">新增</button>
+    </div>
+  </div>
+
+  <!-- 圖例 -->
+  <div class="ssec">
+    <h4>圖例說明</h4>
+    <div style="display:flex;flex-direction:column;gap:8px;">
+      <div style="display:flex;align-items:center;gap:12px;"><span class="spill s0">未完成</span><span style="color:var(--text2);font-size:13px">尚未繳交或填寫</span></div>
+      <div style="display:flex;align-items:center;gap:12px;"><span class="spill s1">已繳數據</span><span style="color:var(--text2);font-size:13px">數字/統計已填寫</span></div>
+      <div style="display:flex;align-items:center;gap:12px;"><span class="spill s2">已繳資料</span><span style="color:var(--text2);font-size:13px">文件/檔案已繳交</span></div>
+      <div style="display:flex;align-items:center;gap:12px;"><span class="spill s3">待確認</span><span style="color:var(--text2);font-size:13px">已收到，待確認</span></div>
+      <div style="display:flex;align-items:center;gap:12px;"><span class="spill s4">異常</span><span style="color:var(--text2);font-size:13px">資料異常或無法執行</span></div>
+      <div style="display:flex;align-items:center;gap:12px;"><span class="spill s5">已配合</span><span style="color:var(--text2);font-size:13px">公告事項已配合完成</span></div>
+    </div>
+  </div>
+</div>
+
+</div><!-- /main -->
+
+<!-- ITEM MODAL -->
+<div class="overlay h" id="itemModal">
+  <div class="modal">
+    <h3 id="modalTitle">新增追蹤項目</h3>
+    <div class="frow">
+      <div class="fg" style="flex:2;">
+        <label class="flabel">項目名稱 *</label>
+        <input class="fi" id="fName" placeholder="例：住院醫師評量統計">
+      </div>
+      <div class="fg" style="flex:1;">
+        <label class="flabel">類型 *</label>
+        <select class="fi" id="fType2">
+          <option value="data">📊 填數據</option>
+          <option value="file">📁 繳資料</option>
+          <option value="notice">📢 公告配合</option>
+        </select>
+      </div>
+    </div>
+    <div class="frow">
+      <div class="fg">
+        <label class="flabel">開始日期 *</label>
+        <input class="fi" id="fStart" type="date">
+        <div class="hint">任務開放/公告開始</div>
+      </div>
+      <div class="fg">
+        <label class="flabel">截止日期 *</label>
+        <input class="fi" id="fEnd" type="date">
+        <div class="hint">最終截止/配合期限</div>
+      </div>
+    </div>
+    <div class="fg">
+      <label class="flabel">是否為臨時項目</label>
+      <select class="fi" id="fTemp">
+        <option value="0">固定年度項目</option>
+        <option value="1">臨時項目（本年度）</option>
+      </select>
+    </div>
+    <div class="fg">
+      <label class="flabel">適用職類 *</label>
+      <div style="display:flex;gap:6px;margin-bottom:6px;">
+        <button class="btn" style="font-size:11px;padding:3px 10px;" onclick="checkAll(true)">全選</button>
+        <button class="btn" style="font-size:11px;padding:3px 10px;" onclick="checkAll(false)">全取消</button>
+      </div>
+      <div class="cbgrid" id="deptCbs"></div>
+    </div>
+    <div class="fg">
+      <label class="flabel">備註說明</label>
+      <input class="fi" id="fNote" placeholder="選填">
+    </div>
+    <div class="mfooter">
+      <button class="btn" onclick="closeModal()">取消</button>
+      <button class="btn pri" onclick="saveItem()">儲存</button>
+    </div>
+  </div>
+</div>
+
+<!-- STATUS PICKER -->
+<div class="sp-overlay" id="spOv" style="display:none;" onclick="closePicker()"></div>
+<div class="sp-box" id="spBox" style="display:none;"><div id="spOpts"></div></div>
+
+<!-- LOGIN MODAL -->
+<div class="login-overlay h" id="loginOverlay">
+  <div class="login-box">
+    <div class="lock-icon">🔐</div>
+    <h3>管理員登入</h3>
+    <div class="login-sub">項目管理與設定功能僅限管理員使用</div>
+    <div class="fg">
+      <label class="flabel">帳號</label>
+      <input class="fi" id="loginUser" placeholder="請輸入帳號" autocomplete="username" onkeydown="if(event.key==='Enter')document.getElementById('loginPwd').focus()">
+    </div>
+    <div class="fg">
+      <label class="flabel">密碼</label>
+      <input class="fi" id="loginPwd" type="password" placeholder="請輸入密碼" autocomplete="current-password" onkeydown="if(event.key==='Enter')doLogin()">
+    </div>
+    <div class="login-err" id="loginErr"></div>
+    <div class="login-footer">
+      <button class="btn" onclick="closeLogin()">取消</button>
+      <button class="btn pri" onclick="doLogin()">登入</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ══════════════════════════════════════════
+//  CONSTANTS
+// ══════════════════════════════════════════
+const DEFAULT_DEPTS = [
+  '內科部','外科部','放射科','家庭醫學部','藥師',
+  '醫事放射師','醫師檢驗師','護理師','營養師',
+  '呼吸治療師','物理治療師','職能治療師','臨床心理師'
+];
+const SL = ['未完成','已繳數據','已繳資料','待確認','異常','已配合'];
+const S_SUBMIT = [0,1,2,3,4];
+const S_NOTICE = [0,5,3,4];
+const TYPE_LABEL = {data:'📊 數據',file:'📁 資料',notice:'📢 公告'};
+
+// ══════════════════════════════════════════
+//  STATE
+// ══════════════════════════════════════════
+let G = {
+  year: new Date().getFullYear(),
+  depts: [...DEFAULT_DEPTS],
+  items: [],
+  statusMap: {},  // itemId-dept => 0-5
+  editId: null,
+  // GitHub config (stored separately in localStorage, never in Excel)
+  cfg: { user:'', repo:'', path:'tracking_data.xlsx', token:'',
+         adminUser:'admin', adminPass:'1234' },  // 預設帳密，請在設定頁修改
+  // runtime
+  fileSha: '',
+  dirty: false,
+};
+
+// ══════════════════════════════════════════
+//  ADMIN AUTH
+// ══════════════════════════════════════════
+const ADMIN_SESSION_KEY = 'ats_admin_session';
+
+function isAdmin(){
+  return sessionStorage.getItem(ADMIN_SESSION_KEY) === 'true';
+}
+
+function requireAdmin(tabName, btn){
+  if(isAdmin()){
+    switchTab(tabName, btn);
+  } else {
+    // store pending tab
+    window._pendingTab = {name: tabName, btn};
+    document.getElementById('loginUser').value = '';
+    document.getElementById('loginPwd').value = '';
+    document.getElementById('loginErr').textContent = '';
+    document.getElementById('loginOverlay').classList.remove('h');
+    setTimeout(()=>document.getElementById('loginUser').focus(), 100);
+  }
+}
+
+function doLogin(){
+  const u = document.getElementById('loginUser').value.trim();
+  const p = document.getElementById('loginPwd').value;
+  if(u === G.cfg.adminUser && p === G.cfg.adminPass){
+    sessionStorage.setItem(ADMIN_SESSION_KEY, 'true');
+    document.getElementById('loginOverlay').classList.add('h');
+    updateAdminBadge();
+    toast('已登入管理員模式');
+    // go to pending tab
+    if(window._pendingTab){
+      switchTab(window._pendingTab.name, window._pendingTab.btn);
+      window._pendingTab = null;
+    }
+  } else {
+    document.getElementById('loginErr').textContent = '帳號或密碼錯誤，請重試';
+    document.getElementById('loginPwd').value = '';
+    document.getElementById('loginPwd').focus();
+  }
+}
+
+function closeLogin(){
+  document.getElementById('loginOverlay').classList.add('h');
+  window._pendingTab = null;
+}
+
+function adminLogout(){
+  sessionStorage.removeItem(ADMIN_SESSION_KEY);
+  updateAdminBadge();
+  // if on admin tab, redirect to overview
+  const active = document.querySelector('.panel.active');
+  if(active && (active.id==='panel-items'||active.id==='panel-settings')){
+    const overviewTab = document.getElementById('tab-overview');
+    switchTab('overview', overviewTab);
+  }
+  toast('已登出管理員模式');
+}
+
+function updateAdminBadge(){
+  const badge = document.getElementById('adminBadge');
+  if(isAdmin()){
+    badge.style.display = 'flex';
+    badge.innerHTML = `<span class="admin-badge" onclick="adminLogout()" title="點擊登出">🛡 管理員 ✕</span>`;
+    // update tab labels
+    document.getElementById('tab-items').textContent = '📝 項目管理';
+    document.getElementById('tab-settings').textContent = '⚙️ 設定';
+  } else {
+    badge.style.display = 'none';
+    document.getElementById('tab-items').textContent = '📝 項目管理 🔒';
+    document.getElementById('tab-settings').textContent = '⚙️ 設定 🔒';
+  }
+}
+
+// ── persistence ──
+function saveCfg(){
+  localStorage.setItem('ats_cfg', JSON.stringify(G.cfg));
+}
+function loadCfg(){
+  try{
+    const c = JSON.parse(localStorage.getItem('ats_cfg')||'{}');
+    Object.assign(G.cfg, c);
+  }catch(e){}
+}
+function saveLocal(){
+  // save non-config state locally as fallback
+  const d = {year:G.year, depts:G.depts, items:G.items, statusMap:G.statusMap};
+  localStorage.setItem('ats_data', JSON.stringify(d));
+}
+function loadLocal(){
+  try{
+    const d = JSON.parse(localStorage.getItem('ats_data')||'null');
+    if(d){ Object.assign(G, d); }
+  }catch(e){}
+}
+
+// ══════════════════════════════════════════
+//  HELPERS
+// ══════════════════════════════════════════
+const sk = (id,dept) => `${id}-${dept}`;
+const gs = (id,dept) => G.statusMap[sk(id,dept)] ?? 0;
+
+function toast(msg, dur=2200){
+  const el=document.getElementById('toast');
+  el.textContent=msg; el.classList.add('show');
+  clearTimeout(el._t); el._t=setTimeout(()=>el.classList.remove('show'), dur);
+}
+function genId(){ return 'i'+Date.now()+Math.random().toString(36).slice(2,6); }
+
+function fmt(d){ if(!d) return '—'; const dt=new Date(d+'T00:00:00'); return `${dt.getMonth()+1}/${dt.getDate()}`; }
+function daysDiff(ds){ const t=new Date(); t.setHours(0,0,0,0); return Math.round((new Date(ds+'T00:00:00')-t)/86400000); }
+function today(){ return new Date().toISOString().slice(0,10); }
+function isActive(i){ const t=today(); return i.dateStart<=t && t<=i.dateEnd; }
+function isOverdue(i){ return today()>i.dateEnd; }
+function isUpcoming(i,days=30){ return i.dateStart>today() && daysDiff(i.dateStart)<=days; }
+function yearItems(){ const y=String(G.year); return G.items.filter(i=>(i.dateStart||'').startsWith(y)||(i.dateEnd||'').startsWith(y)); }
+function doneCount(item){ let d=0; for(const dp of item.depts){ const s=gs(item.id,dp); if(s===1||s===2||s===5)d++; } return {done:d,total:item.depts.length}; }
+
+function markDirty(){
+  G.dirty=true;
+  const btn=document.getElementById('syncBtn');
+  btn.className='sync-btn saving';
+  btn.textContent='● 未儲存';
+  saveLocal();
+}
+
+// ══════════════════════════════════════════
+//  TABS
+// ══════════════════════════════════════════
+function switchTab(name, btn){
+  document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(b=>b.classList.remove('active'));
+  document.getElementById('panel-'+name).classList.add('active');
+  btn.classList.add('active');
+  if(name==='overview') renderOverview();
+  if(name==='matrix') renderMatrix();
+  if(name==='items') renderItems();
+  if(name==='settings') renderSettings();
+}
+function changeYear(d){
+  G.year+=d; document.getElementById('yearVal').textContent=G.year;
+  updateTopStatus(); saveLocal();
+  const a=document.querySelector('.panel.active');
+  if(a.id==='panel-overview') renderOverview();
+  if(a.id==='panel-matrix') renderMatrix();
+}
+function updateTopStatus(){
+  const t=today(); const ai=G.items.filter(i=>isActive(i)).length;
+  document.getElementById('topStatus').textContent=
+    `${G.year}年度・${G.items.length}項追蹤・${G.depts.length}職類・進行中${ai}項・${new Date().getMonth()+1}/${new Date().getDate()}`;
+}
+
+// ══════════════════════════════════════════
+//  OVERVIEW
+// ══════════════════════════════════════════
+function renderOverview(){
+  updateTopStatus();
+  const yi = yearItems();
+
+  // setup banner
+  const hasCfg = G.cfg.user && G.cfg.repo && G.cfg.token;
+  document.getElementById('setupBanner').innerHTML = hasCfg ? '' : `
+    <div class="setup-banner">
+      <h3>🔧 首次使用 - 請先完成 GitHub 連線設定</h3>
+      <div class="setup-steps">
+        <div class="setup-step"><div class="step-num">1</div><div class="step-body">
+          <div class="step-label">建立 GitHub Repository</div>
+          <div class="step-desc">在 GitHub 建立一個新的 repo（可設為 Private），將 <code>tracking_data.xlsx</code> 和 <code>index.html</code> 上傳進去</div>
+        </div></div>
+        <div class="setup-step"><div class="step-num">2</div><div class="step-body">
+          <div class="step-label">開啟 GitHub Pages</div>
+          <div class="step-desc">repo → Settings → Pages → Source 選 main branch → Save。之後用 <code>https://你的帳號.github.io/repo名稱</code> 開啟</div>
+        </div></div>
+        <div class="setup-step"><div class="step-num">3</div><div class="step-body">
+          <div class="step-label">產生 Personal Access Token</div>
+          <div class="step-desc">GitHub → Settings → Developer settings → Personal access tokens → Fine-grained tokens → 產生 Token，勾選此 repo 的 Contents 讀寫權限</div>
+        </div></div>
+        <div class="setup-step"><div class="step-num">4</div><div class="step-body">
+          <div class="step-label">填入設定</div>
+          <div class="step-desc">到上方「⚙️ 設定」頁填入帳號、repo名稱、Token，按儲存後即可使用</div>
+        </div></div>
+      </div>
+    </div>`;
+
+  // KPI
+  let total=0,done=0,pend=0,abn=0,nt=0,nd=0;
+  for(const item of yi) for(const dp of item.depts){
+    const s=gs(item.id,dp);
+    if(item.type==='notice'){ nt++; if(s===5)nd++; }
+    else{ total++; if(s===1||s===2)done++; else if(s===3)pend++; else if(s===4)abn++; }
+  }
+  const pct=total?Math.round(done/total*100):0;
+  const npct=nt?Math.round(nd/nt*100):0;
+
+  // upcoming
+  const alerts = yi
+    .filter(i=>isActive(i)||isOverdue(i)||isUpcoming(i,30))
+    .map(i=>{
+      const dd=daysDiff(i.dateEnd); const {done:d,total:t}=doneCount(i);
+      const over=isOverdue(i);
+      let dlabel,dcls;
+      if(over){dlabel=`逾期${Math.abs(dd)}天`;dcls='days-over';}
+      else if(dd===0){dlabel='今日截止';dcls='days-warn';}
+      else if(dd<=3){dlabel=`還有${dd}天`;dcls='days-warn';}
+      else{dlabel=`還有${dd}天`;dcls='days-ok';}
+      const bc=over?'ub-over':i.type==='notice'?'ub-notice':'ub-submit';
+      return `<div class="up-item">
+        <span class="up-badge ${bc}">${TYPE_LABEL[i.type]}</span>
+        <div style="flex:1;"><div class="up-name">${i.name}</div>
+        <div class="up-meta">截止 ${fmt(i.dateEnd)}・完成 ${d}/${t} 職類</div></div>
+        <div class="up-days ${dcls}">${dlabel}</div>
+      </div>`;
+    }).slice(0,8);
+
+  // dept progress
+  const drows = G.depts.map(dp=>{
+    let d=0,t=0;
+    for(const item of yi){ if(!item.depts.includes(dp))continue; t++; const s=gs(item.id,dp); if(s===1||s===2||s===5)d++; }
+    const p=t?Math.round(d/t*100):0;
+    const col=p>=80?'var(--green)':p>=40?'var(--warn)':'var(--red)';
+    return `<div class="dept-row">
+      <div class="dept-name" title="${dp}">${dp}</div>
+      <div class="prog-bg"><div class="prog-fill" style="width:${p}%;background:${col}"></div></div>
+      <div class="prog-pct">${p}%</div>
+    </div>`;
+  });
+
+  document.getElementById('overviewContent').innerHTML=`
+    <div class="kpi-row">
+      <div class="kpi blue"><div class="kpi-label">繳交完成率</div><div class="kpi-val">${pct}%</div><div class="kpi-sub">${done}/${total} 格</div></div>
+      <div class="kpi green"><div class="kpi-label">已完成</div><div class="kpi-val">${done}</div><div class="kpi-sub">數據或資料</div></div>
+      <div class="kpi purple"><div class="kpi-label">待確認</div><div class="kpi-val">${pend}</div><div class="kpi-sub">已收待核確</div></div>
+      <div class="kpi red"><div class="kpi-label">異常</div><div class="kpi-val">${abn}</div><div class="kpi-sub">需跟催</div></div>
+      <div class="kpi orange"><div class="kpi-label">公告配合率</div><div class="kpi-val">${npct}%</div><div class="kpi-sub">${nd}/${nt} 格</div></div>
+    </div>
+    <div class="grid2">
+      <div class="card"><div class="card-title"><span class="dot"></span>各職類完成進度</div>${drows.join('')||'<div style="color:var(--text3)">尚無職類</div>'}</div>
+      <div class="card"><div class="card-title"><span class="dot" style="background:var(--warn)"></span>即將到期 / 逾期項目</div>
+        <div class="upcoming-list">${alerts.join('')||'<div style="color:var(--text3);font-size:13px;text-align:center;padding:20px">近期無待辦項目</div>'}</div>
+      </div>
+    </div>`;
+}
+
+// ══════════════════════════════════════════
+//  MATRIX
+// ══════════════════════════════════════════
+function renderMatrix(){
+  const fT=document.getElementById('fType').value;
+  const fS=document.getElementById('fStatus').value;
+  const fP=document.getElementById('fPeriod').value;
+  let items=yearItems();
+  if(fT!=='all') items=items.filter(i=>i.type===fT);
+  if(fP==='active') items=items.filter(i=>isActive(i));
+  else if(fP==='overdue') items=items.filter(i=>isOverdue(i));
+  else if(fP==='upcoming') items=items.filter(i=>isUpcoming(i,30));
+
+  if(!items.length||!G.depts.length){
+    document.getElementById('mTable').closest('.mwrap').innerHTML='<div style="padding:60px;text-align:center;color:var(--text3)">無符合條件的項目</div>';return;
+  }
+
+  const submit=items.filter(i=>i.type!=='notice');
+  const notice=items.filter(i=>i.type==='notice');
+
+  let html=`<thead><tr><th class="icol">追蹤項目</th>`;
+  for(const d of G.depts) html+=`<th title="${d}">${d.length>4?d.slice(0,4)+'…':d}</th>`;
+  html+=`</tr></thead><tbody>`;
+
+  const renderRows=(arr,label)=>{
+    if(!arr.length) return '';
+    let r='';
+    if(label) r+=`<tr class="sec-hdr"><td colspan="${G.depts.length+1}">${label}</td></tr>`;
+    for(const item of arr){
+      const over=isOverdue(item), active=isActive(item);
+      const bl=over?'border-left:3px solid var(--red)':active?'border-left:3px solid var(--green)':'';
+      const dc=item.dateEnd&&daysDiff(item.dateEnd)<=3&&!over?'color:var(--warn)':over?'color:var(--red)':'color:var(--text3)';
+      r+=`<tr><td class="icell" style="${bl}">
+        <div class="item-name">${item.name}${item.temp?'<span class="tbadge tb-temp" style="margin-left:5px">臨時</span>':''}</div>
+        <div><span class="tbadge ${item.type==='data'?'tb-data':item.type==='file'?'tb-file':'tb-notice'}">${TYPE_LABEL[item.type]}</span>
+        <span class="item-meta" style="${dc}">${fmt(item.dateStart)}～${fmt(item.dateEnd)}</span></div>
+        ${item.note?`<div style="font-size:10px;color:var(--text3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:210px" title="${item.note}">💬 ${item.note}</div>`:''}
+      </td>`;
+      for(const dp of G.depts){
+        if(!item.depts.includes(dp)){r+=`<td class="nacell">—</td>`;continue;}
+        const s=gs(item.id,dp);
+        if(fS!=='all'&&String(s)!==fS){r+=`<td class="nacell">—</td>`;continue;}
+        r+=`<td class="scell" onclick="openPicker(event,'${item.id}','${dp}',${item.type==='notice'})">
+          <span class="spill s${s}">${SL[s]}</span></td>`;
+      }
+      r+=`</tr>`;
+    }
+    return r;
+  };
+  html+=renderRows(submit, submit.length&&notice.length?'📋 繳交追蹤項目':'');
+  html+=renderRows(notice, notice.length&&submit.length?'📢 公告配合項目':'');
+  html+=`</tbody>`;
+  document.querySelector('.mwrap').innerHTML=`<table class="mtable" id="mTable">${html}</table>`;
+}
+
+// ══════════════════════════════════════════
+//  STATUS PICKER
+// ══════════════════════════════════════════
+let _pc=null;
+function openPicker(e,itemId,dept,isNotice){
+  e.stopPropagation(); _pc={itemId,dept};
+  const opts=isNotice?S_NOTICE:S_SUBMIT;
+  document.getElementById('spOpts').innerHTML=opts.map(s=>
+    `<div class="sp-item" onclick="setStatus(${s})"><span class="spill s${s}">${SL[s]}</span></div>`).join('');
+  const sp=document.getElementById('spBox');
+  sp.style.display='block'; document.getElementById('spOv').style.display='block';
+  const r=e.currentTarget.getBoundingClientRect();
+  sp.style.top=(r.bottom+4+scrollY)+'px';
+  sp.style.left=Math.min(r.left,innerWidth-170)+'px';
+}
+function closePicker(){ document.getElementById('spBox').style.display='none'; document.getElementById('spOv').style.display='none'; _pc=null; }
+function setStatus(s){
+  if(!_pc)return;
+  G.statusMap[sk(_pc.itemId,_pc.dept)]=s;
+  markDirty(); closePicker(); renderMatrix(); renderOverview();
+  toast(`已更新為「${SL[s]}」`);
+}
+
+// ══════════════════════════════════════════
+//  ITEMS
+// ══════════════════════════════════════════
+function renderItems(){
+  const submit=G.items.filter(i=>i.type!=='notice');
+  const notice=G.items.filter(i=>i.type==='notice');
+  let html=`<div class="items-hdr"><h3 style="font-size:15px;font-weight:600;">追蹤項目管理</h3><button class="btn pri" onclick="openItemModal()">＋ 新增項目</button></div>`;
+  const sec=(arr,label)=>{
+    if(!arr.length)return '';
+    return `<div><div class="sec-title">${label}</div><div class="ilist">
+      ${arr.map(item=>{
+        const over=isOverdue(item),active=isActive(item);
+        const tag=over?'<span style="font-size:10px;color:var(--red);margin-left:6px">逾期</span>':active?'<span style="font-size:10px;color:var(--green);margin-left:6px">進行中</span>':'';
+        const {done:d,total:t}=doneCount(item);
+        return `<div class="irow ${item.type==='notice'?'notice-row':''}">
+          <div class="iinfo">
+            <div class="iname">${item.name}${item.temp?'<span class="tbadge tb-temp" style="margin-left:8px">臨時</span>':''}${tag}</div>
+            <div class="imeta">📅 ${item.dateStart} ～ ${item.dateEnd}</div>
+            <div class="imeta">職類：${item.depts.join('、')}</div>
+            <div class="imeta">完成 ${d}/${t} 職類${item.note?' ・ 💬 '+item.note:''}</div>
+          </div>
+          <div style="display:flex;gap:6px;flex-shrink:0;">
+            <button class="btn" onclick="openItemModal('${item.id}')">✏ 編輯</button>
+            <button class="btn dng" onclick="delItem('${item.id}')">刪除</button>
+          </div>
+        </div>`;
+      }).join('')}
+    </div></div>`;
+  };
+  html+=sec(submit,'📋 繳交追蹤項目');
+  html+=sec(notice,'📢 公告配合項目');
+  if(!G.items.length) html+='<div style="text-align:center;padding:60px;color:var(--text3)">尚無項目，點擊「新增項目」開始</div>';
+  document.getElementById('itemsSections').innerHTML=html;
+}
+function openItemModal(id=null){
+  G.editId=id;
+  document.getElementById('modalTitle').textContent=id?'編輯追蹤項目':'新增追蹤項目';
+  document.getElementById('deptCbs').innerHTML=G.depts.map((d,i)=>
+    `<label class="cbi"><input type="checkbox" id="cb${i}" value="${d}"><label for="cb${i}">${d}</label></label>`).join('');
+  if(id){
+    const item=G.items.find(i=>i.id===id); if(!item)return;
+    document.getElementById('fName').value=item.name;
+    document.getElementById('fType2').value=item.type;
+    document.getElementById('fTemp').value=item.temp?'1':'0';
+    document.getElementById('fStart').value=item.dateStart||'';
+    document.getElementById('fEnd').value=item.dateEnd||'';
+    document.getElementById('fNote').value=item.note||'';
+    G.depts.forEach((d,i)=>{ const cb=document.getElementById('cb'+i); if(cb)cb.checked=item.depts.includes(d); });
+  } else {
+    ['fName','fNote'].forEach(id=>document.getElementById(id).value='');
+    document.getElementById('fType2').value='data';
+    document.getElementById('fTemp').value='0';
+    const y=G.year;
+    document.getElementById('fStart').value=`${y}-01-01`;
+    document.getElementById('fEnd').value=`${y}-01-31`;
+    G.depts.forEach((_,i)=>{ const cb=document.getElementById('cb'+i); if(cb)cb.checked=false; });
+  }
+  document.getElementById('itemModal').classList.remove('h');
+}
+function closeModal(){ document.getElementById('itemModal').classList.add('h'); G.editId=null; }
+function checkAll(v){ G.depts.forEach((_,i)=>{ const cb=document.getElementById('cb'+i); if(cb)cb.checked=v; }); }
+function saveItem(){
+  const name=document.getElementById('fName').value.trim();
+  if(!name){toast('請填寫項目名稱');return;}
+  const ds=document.getElementById('fStart').value, de=document.getElementById('fEnd').value;
+  if(!ds||!de){toast('請設定日期區間');return;}
+  if(ds>de){toast('截止日期需晚於開始日期');return;}
+  const depts=[...document.querySelectorAll('#deptCbs input:checked')].map(el=>el.value);
+  if(!depts.length){toast('請選擇適用職類');return;}
+  const data={name,type:document.getElementById('fType2').value,temp:document.getElementById('fTemp').value==='1',dateStart:ds,dateEnd:de,depts,note:document.getElementById('fNote').value.trim()};
+  if(G.editId){ const idx=G.items.findIndex(i=>i.id===G.editId); if(idx>=0)G.items[idx]={...G.items[idx],...data}; toast('已更新'); }
+  else{ G.items.push({id:genId(),...data}); toast('已新增'); }
+  markDirty(); closeModal(); renderItems();
+}
+function delItem(id){
+  if(!confirm('確定刪除？'))return;
+  G.items=G.items.filter(i=>i.id!==id);
+  markDirty(); renderItems(); toast('已刪除');
+}
+
+// ══════════════════════════════════════════
+//  SETTINGS
+// ══════════════════════════════════════════
+function renderSettings(){
+  // admin fields
+  document.getElementById('cfgAdminUser').value = G.cfg.adminUser || 'admin';
+  document.getElementById('cfgAdminPass').value = '';
+  document.getElementById('cfgAdminPass2').value = '';
+  // fill cfg fields
+  ['cfgUser','cfgRepo','cfgPath','cfgToken'].forEach(id=>{
+    const key=id.replace('cfg','').toLowerCase();
+    const map={cfguser:'user',cfgrepo:'repo',cfgpath:'path',cfgtoken:'token'};
+    const el=document.getElementById(id);
+    if(el) el.value=G.cfg[map[id.toLowerCase()]]||'';
+  });
+  // dept tags
+  document.getElementById('deptTags').innerHTML=G.depts.map((d,i)=>
+    `<div class="dtag">${d}<span class="rm" onclick="removeDept(${i})">×</span></div>`).join('');
+}
+function saveConfig(){
+  // admin credentials
+  const newUser = document.getElementById('cfgAdminUser').value.trim();
+  const newPass = document.getElementById('cfgAdminPass').value;
+  const newPass2 = document.getElementById('cfgAdminPass2').value;
+  if(newUser) G.cfg.adminUser = newUser;
+  if(newPass || newPass2){
+    if(newPass !== newPass2){ toast('兩次密碼輸入不一致，請重新確認'); return; }
+    if(newPass.length < 4){ toast('密碼至少需要 4 個字元'); return; }
+    G.cfg.adminPass = newPass;
+  }
+  G.cfg.user=document.getElementById('cfgUser').value.trim();
+  G.cfg.repo=document.getElementById('cfgRepo').value.trim();
+  G.cfg.path=document.getElementById('cfgPath').value.trim()||'tracking_data.xlsx';
+  G.cfg.token=document.getElementById('cfgToken').value.trim();
+  saveCfg(); toast('設定已儲存（Token 存於本機）');
+  document.getElementById('cfgStatus').innerHTML='<span style="color:var(--green)">✓ 設定已儲存</span>';
+}
+async function testConnection(){
+  if(!G.cfg.user||!G.cfg.repo||!G.cfg.token){toast('請先填寫並儲存設定');return;}
+  document.getElementById('cfgStatus').innerHTML='<span style="color:var(--warn)">測試連線中...</span>';
+  try{
+    const r=await fetch(`https://api.github.com/repos/${G.cfg.user}/${G.cfg.repo}`,
+      {headers:{Authorization:`token ${G.cfg.token}`,'Accept':'application/vnd.github.v3+json'}});
+    if(r.ok){
+      document.getElementById('cfgStatus').innerHTML='<span style="color:var(--green)">✓ 連線成功！</span>';
+      toast('GitHub 連線成功');
+    } else {
+      document.getElementById('cfgStatus').innerHTML=`<span style="color:var(--red)">✗ 連線失敗（${r.status}）：請確認帳號、repo名稱與Token權限</span>`;
+    }
+  }catch(e){
+    document.getElementById('cfgStatus').innerHTML='<span style="color:var(--red)">✗ 網路錯誤</span>';
+  }
+}
+function addDept(){
+  const v=document.getElementById('newDept').value.trim();
+  if(!v)return; if(G.depts.includes(v)){toast('已存在');return;}
+  G.depts.push(v); document.getElementById('newDept').value='';
+  markDirty(); renderSettings(); toast(`已新增：${v}`);
+}
+function removeDept(i){
+  if(!confirm(`移除「${G.depts[i]}」？`))return;
+  G.depts.splice(i,1); markDirty(); renderSettings(); toast('已移除');
+}
+
+// ══════════════════════════════════════════
+//  EXCEL ←→ GITHUB
+// ══════════════════════════════════════════
+
+// ── Build Excel binary from state ──
+function buildExcel(){
+  const wb = XLSX.utils.book_new();
+
+  // Sheet1: 追蹤矩陣
+  const depts = G.depts;
+  const hdr = ['項目名稱','類型','臨時','開始日期','截止日期','備註',...depts];
+  const rows = [hdr];
+  for(const item of G.items){
+    const typeLabel = {data:'填數據',file:'繳資料',notice:'公告配合'}[item.type]||item.type;
+    const base = [item.name, typeLabel, item.temp?'是':'否', item.dateStart, item.dateEnd, item.note||''];
+    const dCols = depts.map(dp => {
+      if(!item.depts.includes(dp)) return '—';
+      return SL[gs(item.id,dp)];
+    });
+    rows.push([...base,...dCols]);
+  }
+  const ws1 = XLSX.utils.aoa_to_sheet(rows);
+  ws1['!cols'] = [{wch:22},{wch:10},{wch:6},{wch:12},{wch:12},{wch:20},...depts.map(()=>({wch:11}))];
+  XLSX.utils.book_append_sheet(wb, ws1, '追蹤矩陣');
+
+  // Sheet2: 項目設定
+  const hdr2 = ['#','項目名稱','類型','臨時','開始日期','截止日期','適用職類','備註'];
+  const rows2 = [hdr2, ...G.items.map((item,i)=>[
+    i+1, item.name,
+    {data:'填數據',file:'繳資料',notice:'公告配合'}[item.type],
+    item.temp?'是':'否', item.dateStart, item.dateEnd,
+    item.depts.join('、'), item.note||''
+  ])];
+  const ws2 = XLSX.utils.aoa_to_sheet(rows2);
+  ws2['!cols']=[{wch:4},{wch:22},{wch:10},{wch:6},{wch:12},{wch:12},{wch:40},{wch:30}];
+  XLSX.utils.book_append_sheet(wb, ws2, '項目設定');
+
+  // Sheet3: 職類清單
+  const ws3 = XLSX.utils.aoa_to_sheet([['#','職類名稱'],...G.depts.map((d,i)=>[i+1,d])]);
+  ws3['!cols']=[{wch:5},{wch:18}];
+  XLSX.utils.book_append_sheet(wb, ws3, '職類清單');
+
+  // Sheet4: 狀態對照
+  const ws4 = XLSX.utils.aoa_to_sheet([
+    ['狀態代碼','說明'],
+    [0,'未完成'],[1,'已繳數據'],[2,'已繳資料'],[3,'待確認'],[4,'異常'],[5,'已配合（公告）'],
+    ['',''],
+    ['更新時間', new Date().toLocaleString('zh-TW')]
+  ]);
+  ws4['!cols']=[{wch:10},{wch:20}];
+  XLSX.utils.book_append_sheet(wb, ws4, 'README');
+
+  return XLSX.write(wb, {type:'base64', bookType:'xlsx'});
+}
+
+// ── Parse Excel from base64 ──
+function parseExcel(b64){
+  const wb = XLSX.read(b64, {type:'base64'});
+
+  // 讀職類清單
+  if(wb.SheetNames.includes('職類清單')){
+    const ws = wb.Sheets['職類清單'];
+    const rows = XLSX.utils.sheet_to_json(ws, {header:1}).slice(1);
+    const depts = rows.map(r=>r[1]).filter(Boolean);
+    if(depts.length) G.depts = depts;
+  }
+
+  // 讀項目設定
+  if(wb.SheetNames.includes('項目設定')){
+    const ws = wb.Sheets['項目設定'];
+    const rows = XLSX.utils.sheet_to_json(ws, {header:1}).slice(1);
+    G.items = rows.filter(r=>r[1]).map((r,idx)=>({
+      id: 'e'+idx+'_'+(r[1]||'').slice(0,6).replace(/\s/g,''),
+      name: String(r[1]||''),
+      type: r[2]==='公告配合'?'notice':r[2]==='繳資料'?'file':'data',
+      temp: r[3]==='是',
+      dateStart: r[4]||'',
+      dateEnd:   r[5]||'',
+      depts: String(r[6]||'').split('、').filter(Boolean),
+      note:  String(r[7]||''),
+    }));
+  }
+
+  // 讀追蹤矩陣（狀態）
+  if(wb.SheetNames.includes('追蹤矩陣')){
+    const ws = wb.Sheets['追蹤矩陣'];
+    const rows = XLSX.utils.sheet_to_json(ws, {header:1});
+    if(rows.length>=1){
+      const hdr = rows[0];
+      const deptStart = 6; // G欄起
+      const deptNames = hdr.slice(deptStart);
+      const statusToNum = {'未完成':0,'已繳數據':1,'已繳資料':2,'待確認':3,'異常':4,'已配合':5};
+      G.statusMap = {};
+      for(let ri=1;ri<rows.length;ri++){
+        const row=rows[ri];
+        const itemName=String(row[0]||'');
+        const item=G.items.find(i=>i.name===itemName);
+        if(!item)continue;
+        for(let di=0;di<deptNames.length;di++){
+          const dept=deptNames[di]; const val=String(row[deptStart+di]||'');
+          if(val==='—')continue;
+          const s=statusToNum[val];
+          if(s!==undefined) G.statusMap[sk(item.id,dept)]=s;
+        }
+      }
+    }
+  }
+}
+
+// ── Fetch Excel from GitHub ──
+async function fetchFromGitHub(){
+  const {user,repo,path,token}=G.cfg;
+  if(!user||!repo||!token) return false;
+  try{
+    const r=await fetch(`https://api.github.com/repos/${user}/${repo}/contents/${path}`,
+      {headers:{Authorization:`token ${token}`,'Accept':'application/vnd.github.v3+json'}});
+    if(r.status===404){toast('Excel 檔案尚未建立，將使用現有資料');return true;}
+    if(!r.ok) throw new Error(`HTTP ${r.status}`);
+    const data=await r.json();
+    G.fileSha=data.sha;
+    parseExcel(data.content.replace(/\n/g,''));
+    return true;
+  }catch(e){
+    console.error(e);
+    toast('載入 GitHub 資料失敗：'+e.message);
+    return false;
+  }
+}
+
+// ── Push Excel to GitHub ──
+async function syncToGitHub(){
+  const {user,repo,path,token}=G.cfg;
+  if(!user||!repo||!token){toast('請先到「⚙️ 設定」填入 GitHub 資訊');return;}
+  const btn=document.getElementById('syncBtn');
+  btn.className='sync-btn saving'; btn.textContent='☁ 上傳中...';
+  try{
+    const content=buildExcel();
+    const body={message:`update tracking data ${new Date().toLocaleString('zh-TW')}`,content,branch:'main'};
+    if(G.fileSha) body.sha=G.fileSha;
+    const r=await fetch(`https://api.github.com/repos/${user}/${repo}/contents/${path}`,{
+      method:'PUT',
+      headers:{Authorization:`token ${token}`,'Content-Type':'application/json','Accept':'application/vnd.github.v3+json'},
+      body:JSON.stringify(body)
+    });
+    if(!r.ok){
+      const err=await r.json();
+      throw new Error(err.message||`HTTP ${r.status}`);
+    }
+    const data=await r.json();
+    G.fileSha=data.content.sha;
+    G.dirty=false;
+    btn.className='sync-btn ok'; btn.textContent='✓ 已儲存';
+    setTimeout(()=>{ btn.className='sync-btn'; btn.textContent='☁ 儲存至 GitHub'; },3000);
+    saveLocal();
+    toast('已成功上傳至 GitHub');
+  }catch(e){
+    btn.className='sync-btn'; btn.textContent='☁ 儲存至 GitHub';
+    toast('上傳失敗：'+e.message);
+    console.error(e);
+  }
+}
+
+// ══════════════════════════════════════════
+//  CSV EXPORT
+// ══════════════════════════════════════════
+function exportCSV(){
+  const rows=[['項目名稱','類型','開始日期','截止日期','職類','狀態']];
+  for(const item of G.items) for(const dp of item.depts){
+    rows.push([item.name,{data:'填數據',file:'繳資料',notice:'公告配合'}[item.type],
+      item.dateStart,item.dateEnd,dp,SL[gs(item.id,dp)]]);
+  }
+  const csv=rows.map(r=>r.map(c=>`"${String(c).replace(/"/g,'""')}"`).join(',')).join('\n');
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(new Blob(['\uFEFF'+csv],{type:'text/csv;charset=utf-8'}));
+  a.download=`追蹤表_${G.year}.csv`; a.click(); toast('CSV 已匯出');
+}
+
+// ══════════════════════════════════════════
+//  INIT
+// ══════════════════════════════════════════
+async function init(){
+  loadCfg();
+  loadLocal();
+  document.getElementById('yearVal').textContent=G.year;
+  updateAdminBadge();
+
+  const hasCfg=G.cfg.user&&G.cfg.repo&&G.cfg.token;
+  if(hasCfg){
+    document.getElementById('overviewContent').innerHTML='<div class="loading"><div class="spinner"></div><div>從 GitHub 載入最新資料...</div></div>';
+    await fetchFromGitHub();
+  }
+  renderOverview();
+  updateTopStatus();
+}
+init();
+</script>
+</body>
+</html>
