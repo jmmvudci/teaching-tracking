@@ -625,12 +625,14 @@ function renderOverview(){
 
   // upcoming
   const alerts = yi
-    .filter(i=>isActive(i)||isOverdue(i)||isUpcoming(i,30))
+    .filter(i=>i.type==='notice' || isActive(i)||isOverdue(i)||isUpcoming(i,30))
     .map(i=>{
       const dd=daysDiff(i.dateEnd); const {done:d,total:t}=doneCount(i);
       const over=isOverdue(i);
+      const notStarted=i.dateStart>today();
       let dlabel,dcls;
       if(over){dlabel=`逾期${Math.abs(dd)}天`;dcls='days-over';}
+      else if(notStarted){dlabel=`${daysDiff(i.dateStart)}天後開始`;dcls='days-ok';}
       else if(dd===0){dlabel='今日截止';dcls='days-warn';}
       else if(dd<=3){dlabel=`還有${dd}天`;dcls='days-warn';}
       else{dlabel=`還有${dd}天`;dcls='days-ok';}
@@ -641,7 +643,7 @@ function renderOverview(){
         <div class="up-meta">截止 ${fmt(i.dateEnd)}・完成 ${d}/${t} 職類</div></div>
         <div class="up-days ${dcls}">${dlabel}</div>
       </div>`;
-    }).slice(0,8);
+    }).slice(0,12);
 
   // dept progress
   const drows = G.depts.map(dp=>{
