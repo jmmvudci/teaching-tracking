@@ -478,52 +478,35 @@ const DEFAULT_DEPTS = [
 const S_NOTICE = [0,5,3,4];
 const TYPE_LABEL = {data:'📊 數據',file:'📁 資料',notice:'📢 公告'};
 
-// get effective status for a cell, auto-applying overdue
-function getEffectiveStatus(item, dept){
-  const raw = G.statusMap[sk(item.id, dept)];
-  // already overdue marker
-  if(raw === 'overdue') return 'overdue';
-  // completed states - never auto-overdue
-  if(raw === 'done' || (typeof raw === 'string' && raw.match(/^\d{4}-\d{2}-\d{2}$/))) return raw;
-  if(raw === 5 || raw === 3 || raw === 4) return raw;
-  // check auto-overdue: past deadline and not completed
-  if(item.type !== 'notice' && isOverdue(item)){
-    return 'overdue';
-  }
-  return raw ?? 0;
-}
-
-function statusLabel(item, dept){
-  const s = getEffectiveStatus(item, dept);
-  if(s === 0) return '未完成';
-  if(s === 'done') return '已完成';
-  if(s === 'overdue') return '逾期未完成';
-  if(s === 5) return '已配合';
-  if(s === 3) return '待確認';
-  if(s === 4) return '異常';
-  if(typeof s === 'string' && s.match(/^\d{4}-\d{2}-\d{2}$/)){
-    const dt = new Date(s+'T00:00:00');
-    return `${dt.getMonth()+1}/${dt.getDate()} 完成`;
+// Unified status helpers - all period-aware
+function sLabel(s){
+  if(s===0) return '未完成';
+  if(s==='done') return '已完成';
+  if(s==='overdue') return '逾期未完成';
+  if(s===5) return '已配合';
+  if(s===3) return '待確認';
+  if(s===4) return '異常';
+  if(typeof s==='string' && s.match(/^\d{4}-\d{2}-\d{2}$/)){
+    const dt=new Date(s+'T00:00:00');
+    return `${dt.getMonth()+1}/${dt.getDate()}完成`;
   }
   return '未完成';
 }
-
-function statusClass(item, dept){
-  const s = getEffectiveStatus(item, dept);
-  if(s === 0) return 's0';
-  if(s === 'done') return 's2';
-  if(s === 'overdue') return 's4';
-  if(s === 5) return 's5';
-  if(s === 3) return 's3';
-  if(s === 4) return 's4';
-  if(typeof s === 'string' && s.match(/^\d{4}-\d{2}-\d{2}$/)) return 's2';
+function sClass(s){
+  if(s===0) return 's0';
+  if(s==='done'||(typeof s==='string'&&s.match(/^\d{4}-\d{2}-\d{2}$/))) return 's2';
+  if(s==='overdue'||s===4) return 's4';
+  if(s===5) return 's5';
+  if(s===3) return 's3';
   return 's0';
 }
+function sDone(s){ return s==='done'||s===5||(typeof s==='string'&&s.match(/^\d{4}-\d{2}-\d{2}$/)); }
 
-function isDone(item, dept){
-  const s = getEffectiveStatus(item, dept);
-  return s === 'done' || s === 5 || (typeof s === 'string' && s.match(/^\d{4}-\d{2}-\d{2}$/));
-}
+// legacy wrappers (single-period items)
+function getEffectiveStatus(item,dept){ return getEff(item,dept,0); }
+function statusLabel(item,dept){ return sLabel(getEff(item,dept,0)); }
+function statusClass(item,dept){ return sClass(getEff(item,dept,0)); }
+function isDone(item,dept){ return sDone(getEff(item,dept,0)); }
 
 // ══════════════════════════════════════════
 //  STATE
@@ -642,8 +625,49 @@ function loadLocal(){
 // ══════════════════════════════════════════
 //  HELPERS
 // ══════════════════════════════════════════
-const sk = (id,dept) => `${id}-${dept}`;
-const gs = (id,dept) => G.statusMap[sk(id,dept)] ?? 0;
+const sk = (id,dept,per) => per!==undefined ? `${id}-${dept}-${per}` : `${id}-${dept}`;
+const gs = (id,dept,per) => G.statusMap[sk(id,dept,per)] ?? 0;
+
+// ── PERIOD EXPANSION ──
+// Returns array of {label, dateStart, dateEnd, periodIdx} for an item
+function getItemPeriods(item){
+  const y = item.dateStart ? item.dateStart.slice(0,4) : String(G.year);
+  const freq = item.freq;
+  if(!freq || freq==='' || item.type==='notice') return [{label:'', dateStart:item.dateStart, dateEnd:item.dateEnd, periodIdx:0}];
+  if(freq==='yearly') return [{label:'全年', dateStart:`${y}-01-01`, dateEnd:`${y}-12-31`, periodIdx:0}];
+  if(freq==='halfyear') return [
+    {label:'上半年', dateStart:`${y}-01-01`, dateEnd:`${y}-06-30`, periodIdx:0},
+    {label:'下半年', dateStart:`${y}-07-01`, dateEnd:`${y}-12-31`, periodIdx:1},
+  ];
+  if(freq==='quarterly') return [
+    {label:'Q1', dateStart:`${y}-01-01`, dateEnd:`${y}-03-31`, periodIdx:0},
+    {label:'Q2', dateStart:`${y}-04-01`, dateEnd:`${y}-06-30`, periodIdx:1},
+    {label:'Q3', dateStart:`${y}-07-01`, dateEnd:`${y}-09-30`, periodIdx:2},
+    {label:'Q4', dateStart:`${y}-10-01`, dateEnd:`${y}-12-31`, periodIdx:3},
+  ];
+  if(freq==='monthly'){
+    return Array.from({length:12},(_,i)=>{
+      const m=String(i+1).padStart(2,'0');
+      const lastDay=new Date(Number(y),i+1,0).getDate();
+      return {label:`${i+1}月`, dateStart:`${y}-${m}-01`, dateEnd:`${y}-${m}-${lastDay}`, periodIdx:i};
+    });
+  }
+  // irregular - single period from item dates
+  return [{label:'', dateStart:item.dateStart, dateEnd:item.dateEnd, periodIdx:0}];
+}
+
+// get effective status for item+dept+periodIdx
+function getEff(item, dept, periodIdx){
+  const raw = G.statusMap[sk(item.id, dept, periodIdx)];
+  if(raw==='overdue') return 'overdue';
+  if(raw==='done' || (typeof raw==='string' && raw.match(/^\d{4}-\d{2}-\d{2}$/))) return raw;
+  if(raw===5||raw===3||raw===4) return raw;
+  // auto overdue
+  const periods = getItemPeriods(item);
+  const period = periods[periodIdx] || periods[0];
+  if(item.type!=='notice' && today()>period.dateEnd) return 'overdue';
+  return raw ?? 0;
+}
 
 function toast(msg, dur=2200){
   const el=document.getElementById('toast');
@@ -652,14 +676,25 @@ function toast(msg, dur=2200){
 }
 function genId(){ return 'i'+Date.now()+Math.random().toString(36).slice(2,6); }
 
-function fmt(d){ if(!d) return '—'; const dt=new Date(d+'T00:00:00'); return `${dt.getMonth()+1}/${dt.getDate()}`; }
+function fmt(d){
+  if(!d) return '—';
+  const dt=new Date(d+'T00:00:00');
+  const y=dt.getFullYear();
+  const base=`${dt.getMonth()+1}/${dt.getDate()}`;
+  return y!==G.year ? `${y}/${dt.getMonth()+1}/${dt.getDate()}` : base;
+}
 function daysDiff(ds){ const t=new Date(); t.setHours(0,0,0,0); return Math.round((new Date(ds+'T00:00:00')-t)/86400000); }
 function today(){ return new Date().toISOString().slice(0,10); }
 function isActive(i){ const t=today(); return i.dateStart<=t && t<=i.dateEnd; }
 function isOverdue(i){ return today()>i.dateEnd; }
 function isUpcoming(i,days=30){ return i.dateStart>today() && daysDiff(i.dateStart)<=days; }
 function yearItems(){ const y=String(G.year); return G.items.filter(i=>(i.dateStart||'').startsWith(y)); }
-function doneCount(item){ let d=0; for(const dp of item.depts){ if(isDone(item,dp))d++; } return {done:d,total:item.depts.length}; }
+function doneCount(item){
+  const periods=getItemPeriods(item);
+  let d=0, total=item.depts.length*periods.length;
+  for(const dp of item.depts) for(const p of periods){ if(sDone(getEff(item,dp,p.periodIdx)))d++; }
+  return {done:d,total};
+}
 
 function markDirty(){
   G.dirty=true;
@@ -706,35 +741,49 @@ function renderOverview(){
 
   // KPI
   let total=0,done=0,pend=0,abn=0,nt=0,nd=0;
-  for(const item of yi) for(const dp of item.depts){
-    const s=getEffectiveStatus(item,dp);
-    if(item.type==='notice'){ nt++; if(s===5)nd++; }
-    else{ total++; if(isDone(item,dp))done++; else if(s===3)pend++; else if(s===4||s==='overdue')abn++; }
+  for(const item of yi){
+    const periods=getItemPeriods(item);
+    for(const dp of item.depts) for(const p of periods){
+      const s=getEff(item,dp,p.periodIdx);
+      if(item.type==='notice'){ nt++; if(s===5)nd++; }
+      else{ total++; if(sDone(s))done++; else if(s===3)pend++; else if(s===4||s==='overdue')abn++; }
+    }
   }
   const pct=total?Math.round(done/total*100):0;
   const npct=nt?Math.round(nd/nt*100):0;
 
   // upcoming - build alert item HTML
-  const alertItems = yi
-    .filter(i=>i.type==='notice' || isActive(i)||isOverdue(i)||isUpcoming(i,30))
-    .map(i=>{
-      const dd=daysDiff(i.dateEnd); const {done:d,total:t}=doneCount(i);
-      const over=isOverdue(i); const notStarted=i.dateStart>today();
+  // build alertItems: expand periods for periodic items
+  const alertItems = [];
+  for(const i of yi){
+    const periods=getItemPeriods(i);
+    for(const p of periods){
+      const isNoticeType=i.type==='notice';
+      const over=today()>p.dateEnd;
+      const notStarted=p.dateStart>today();
+      const active=!over&&!notStarted;
+      if(!isNoticeType && !over && !active && !isUpcoming({dateStart:p.dateStart},30)) continue;
+      const dd=daysDiff(p.dateEnd);
+      // count done for this period
+      let pd=0,pt=i.depts.length;
+      for(const dp of i.depts){ if(sDone(getEff(i,dp,p.periodIdx)))pd++; }
       let dlabel,dcls;
       if(over){dlabel=`逾期${Math.abs(dd)}天`;dcls='days-over';}
-      else if(notStarted){dlabel=`${daysDiff(i.dateStart)}天後開始`;dcls='days-ok';}
+      else if(notStarted){dlabel=`${daysDiff(p.dateStart)}天後開始`;dcls='days-ok';}
       else if(dd===0){dlabel='今日截止';dcls='days-warn';}
       else if(dd<=3){dlabel=`還有${dd}天`;dcls='days-warn';}
       else{dlabel=`還有${dd}天`;dcls='days-ok';}
-      const bc=over?'ub-over':i.type==='notice'?'ub-notice':'ub-submit';
+      const bc=over?'ub-over':isNoticeType?'ub-notice':'ub-submit';
       const col=i.column||'common';
-      return {col, html:`<div class="up-item">
+      const pLabel=periods.length>1?` (${p.label})`:'';
+      alertItems.push({col, html:`<div class="up-item">
         <span class="up-badge ${bc}">${TYPE_LABEL[i.type]}</span>
-        <div style="flex:1;"><div class="up-name">${i.name}</div>
-        <div class="up-meta">截止 ${fmt(i.dateEnd)}・完成 ${d}/${t} 職類</div></div>
+        <div style="flex:1;"><div class="up-name">${i.name}${pLabel}</div>
+        <div class="up-meta">截止 ${fmt(p.dateEnd)}・完成 ${pd}/${pt} 職類</div></div>
         <div class="up-days ${dcls}">${dlabel}</div>
-      </div>`};
-    });
+      </div>`});
+    }
+  }
 
   const colGroups={common:[],doctor:[],medical:[]};
   alertItems.forEach(a=>{ if(colGroups[a.col]) colGroups[a.col].push(a.html); else colGroups.common.push(a.html); });
@@ -748,7 +797,11 @@ function renderOverview(){
   // dept progress
   const drows = G.depts.map(dp=>{
     let d=0,t=0;
-    for(const item of yi){ if(!item.depts.includes(dp))continue; t++; if(isDone(item,dp))d++; }
+    for(const item of yi){
+      if(!item.depts.includes(dp))continue;
+      const periods=getItemPeriods(item);
+      for(const p of periods){ t++; if(sDone(getEff(item,dp,p.periodIdx)))d++; }
+    }
     const p=t?Math.round(d/t*100):0;
     const col=p>=80?'var(--green)':p>=40?'var(--warn)':'var(--red)';
     return `<div class="dept-row">
@@ -804,30 +857,51 @@ function renderMatrix(){
   const renderRows=(arr,label)=>{
     if(!arr.length) return '';
     let r='';
+    // build header: for periodic items, add sub-header per period
+    const hasMultiPeriod = arr.some(i=>getItemPeriods(i).length>1);
     if(label) r+=`<tr class="sec-hdr"><td colspan="${G.depts.length+1}">${label}</td></tr>`;
     for(const item of arr){
-      const over=isOverdue(item), active=isActive(item);
-      const bl=over?'border-left:3px solid var(--red)':active?'border-left:3px solid var(--green)':'';
-      const dc=item.dateEnd&&daysDiff(item.dateEnd)<=3&&!over?'color:var(--warn)':over?'color:var(--red)':'color:var(--text3)';
-      r+=`<tr><td class="icell" style="${bl}">
-        <div class="item-name">${item.name}${item.temp?'<span class="tbadge tb-temp" style="margin-left:5px">臨時</span>':''}${item.freq?`<span class="tbadge tb-freq" style="margin-left:3px">🔁 ${{yearly:'每年',halfyear:'每半年',quarterly:'每季',monthly:'每月',irregular:'不定期'}[item.freq]||item.freq}</span>`:''}</div>
-        <div><span class="tbadge ${item.type==='data'?'tb-data':item.type==='file'?'tb-file':'tb-notice'}">${TYPE_LABEL[item.type]}</span>
-        <span class="item-meta" style="${dc}">${fmt(item.dateStart)}～${fmt(item.dateEnd)}</span></div>
-        ${item.note?`<div style="font-size:10px;color:var(--text3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:210px" title="${item.note}">💬 ${item.note}</div>`:''}
-      </td>`;
-      for(const dp of G.depts){
-        if(!item.depts.includes(dp)){r+=`<td class="nacell">—</td>`;continue;}
-        const sLbl=statusLabel(item,dp);
-        const sCls=statusClass(item,dp);
-        const sVal=getEffectiveStatus(item,dp);
-        if(fS!=='all'){
-          const matched=(fS==='0'&&sVal===0)||(fS==='done'&&sVal==='done')||(fS==='overdue'&&sVal==='overdue')||(fS==='5'&&sVal===5)||(fS==='3'&&sVal===3)||(fS==='4'&&(sVal===4||sVal==='overdue'));
-          if(!matched){r+=`<td class="nacell">—</td>`;continue;}
+      const periods=getItemPeriods(item);
+      const freqLabel={yearly:'每年',halfyear:'每半年',quarterly:'每季',monthly:'每月',irregular:'不定期'};
+      const typeIcon=item.type==='data'?'tb-data':item.type==='file'?'tb-file':'tb-notice';
+      const freqBadge=item.freq?`<span class="tbadge tb-freq" style="margin-left:3px">🔁 ${freqLabel[item.freq]||item.freq}</span>`:'';
+      const tempBadge=item.temp?'<span class="tbadge tb-temp" style="margin-left:5px">臨時</span>':'';
+
+      for(let pi=0;pi<periods.length;pi++){
+        const p=periods[pi];
+        const over=today()>p.dateEnd, active=today()>=p.dateStart&&today()<=p.dateEnd;
+        const bl=over?'border-left:3px solid #e53e3e':active?'border-left:3px solid #38a169':'';
+        const dc=p.dateEnd&&daysDiff(p.dateEnd)<=3&&!over?'color:#c05621':over?'color:#c53030':'color:#a0aec0';
+        const periodLabel=periods.length>1?`<span style="font-size:10px;color:#718096;font-family:'DM Mono';margin-left:4px">${p.label}</span>`:'';
+        const dateRange=`${fmt(p.dateStart)}～${fmt(p.dateEnd)}`;
+
+        r+=`<tr><td class="icell" style="${bl}">`;
+        if(pi===0){
+          r+=`<div class="item-name">${item.name}${tempBadge}${freqBadge}</div>
+          <div><span class="tbadge ${typeIcon}">${TYPE_LABEL[item.type]}</span>
+          <span class="item-meta" style="${dc}">${dateRange}</span>${periodLabel}</div>
+          ${item.note?`<div style="font-size:10px;color:#a0aec0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:210px" title="${item.note}">💬 ${item.note}</div>`:''}`;
+        } else {
+          r+=`<div style="padding-left:10px;border-left:2px solid #e2e8f0">
+            <span class="item-meta" style="${dc}">${periodLabel} ${dateRange}</span>
+          </div>`;
         }
-        r+=`<td class="scell" onclick="openPicker(event,'${item.id}','${dp}','${item.trackMode||'simple'}',${item.type==='notice'})">
-          <span class="spill ${sCls}">${sLbl}</span></td>`;
+        r+=`</td>`;
+
+        for(const dp of G.depts){
+          if(!item.depts.includes(dp)){r+=`<td class="nacell">—</td>`;continue;}
+          const sVal=getEff(item,dp,p.periodIdx);
+          const sLbl=sLabel(sVal);
+          const sCls=sClass(sVal);
+          if(fS!=='all'){
+            const matched=(fS==='0'&&sVal===0)||(fS==='done'&&sVal==='done')||(fS==='overdue'&&sVal==='overdue')||(fS==='5'&&sVal===5)||(fS==='3'&&sVal===3)||(fS==='4'&&(sVal===4||sVal==='overdue'));
+            if(!matched){r+=`<td class="nacell">—</td>`;continue;}
+          }
+          r+=`<td class="scell" onclick="openPicker(event,'${item.id}','${dp}','${item.trackMode||'simple'}',${item.type==='notice'},${p.periodIdx})">
+            <span class="spill ${sCls}">${sLbl}</span></td>`;
+        }
+        r+=`</tr>`;
       }
-      r+=`</tr>`;
     }
     return r;
   };
@@ -841,8 +915,8 @@ function renderMatrix(){
 //  STATUS PICKER
 // ══════════════════════════════════════════
 let _pc=null;
-function openPicker(e,itemId,dept,trackMode,isNotice){
-  e.stopPropagation(); _pc={itemId,dept,trackMode};
+function openPicker(e,itemId,dept,trackMode,isNotice,periodIdx=0){
+  e.stopPropagation(); _pc={itemId,dept,trackMode,periodIdx};
   let html='';
   if(isNotice){
     html=S_NOTICE.map(s=>{
@@ -879,7 +953,7 @@ function setStatus(s){
     val=document.getElementById('spDateInput').value;
     if(!val){toast('請選擇日期');return;}
   }
-  G.statusMap[sk(_pc.itemId,_pc.dept)]=val;
+  G.statusMap[sk(_pc.itemId,_pc.dept,_pc.periodIdx)]=val;
   markDirty(); closePicker(); renderMatrix(); renderOverview();
   const lbl=val===0?'未完成':val==='done'?'已完成':val===5?'已配合':val===3?'待確認':val===4?'異常':`${val} 完成`;
   toast(`已更新為「${lbl}」`);
@@ -1047,11 +1121,18 @@ function buildExcel(){
   for(const item of G.items){
     const typeLabel = {data:'填數據',file:'繳資料',notice:'公告配合'}[item.type]||item.type;
     const base = [item.name, typeLabel, item.temp?'是':'否', item.dateStart, item.dateEnd, item.note||''];
-    const dCols = depts.map(dp => {
-      if(!item.depts.includes(dp)) return '—';
-      return statusLabel(item, dp);
-    });
-    rows.push([...base,...dCols]);
+    const periods=getItemPeriods(item);
+    for(const p of periods){
+      const dCols = depts.map(dp => {
+        if(!item.depts.includes(dp)) return '—';
+        return sLabel(getEff(item,dp,p.periodIdx));
+      });
+      const pLabel=periods.length>1?` [${p.label}]`:'';
+      rows.push([item.name+pLabel, typeLabel, item.temp?'是':'否', p.dateStart, p.dateEnd, item.note||'', ...dCols]);
+    }
+    // skip the rows.push below - already done above
+    if(false){
+    } // end if(false)
   }
   const ws1 = XLSX.utils.aoa_to_sheet(rows);
   ws1['!cols'] = [{wch:22},{wch:10},{wch:6},{wch:12},{wch:12},{wch:20},...depts.map(()=>({wch:11}))];
@@ -1200,9 +1281,13 @@ async function syncToGitHub(){
 // ══════════════════════════════════════════
 function exportCSV(){
   const rows=[['項目名稱','類型','開始日期','截止日期','職類','狀態']];
-  for(const item of G.items) for(const dp of item.depts){
-    rows.push([item.name,{data:'填數據',file:'繳資料',notice:'公告配合'}[item.type],
-      item.dateStart,item.dateEnd,dp,statusLabel(item,dp)]);
+  for(const item of G.items){
+    const periods=getItemPeriods(item);
+    for(const p of periods) for(const dp of item.depts){
+      const pLabel=periods.length>1?` [${p.label}]`:'';
+      rows.push([item.name+pLabel,{data:'填數據',file:'繳資料',notice:'公告配合'}[item.type],
+        p.dateStart,p.dateEnd,dp,sLabel(getEff(item,dp,p.periodIdx))]);
+    }
   }
   const csv=rows.map(r=>r.map(c=>`"${String(c).replace(/"/g,'""')}"`).join(',')).join('\n');
   const a=document.createElement('a');
