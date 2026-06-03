@@ -689,8 +689,10 @@ const gs = (id,dept,per) => G.statusMap[sk(id,dept,per)] ?? 0;
 function getItemPeriods(item){
   const y = item.dateStart ? item.dateStart.slice(0,4) : String(G.year);
   const freq = item.freq;
-  if(!freq || freq==='' || item.type==='notice') return [{label:'', dateStart:item.dateStart, dateEnd:item.dateEnd, periodIdx:0}];
-  if(freq==='yearly') return [{label:'全年', dateStart:`${y}-01-01`, dateEnd:`${y}-12-31`, periodIdx:0}];
+  // 無頻率、每年、不定期、公告 → 直接用自訂日期，不展開
+  if(!freq || freq==='' || freq==='yearly' || freq==='irregular' || item.type==='notice'){
+    return [{label: freq==='yearly'?'全年': freq==='irregular'?'不定期':'', dateStart:item.dateStart, dateEnd:item.dateEnd, periodIdx:0}];
+  }
   if(freq==='halfyear') return [
     {label:'上半年', dateStart:`${y}-01-01`, dateEnd:`${y}-06-30`, periodIdx:0},
     {label:'下半年', dateStart:`${y}-07-01`, dateEnd:`${y}-12-31`, periodIdx:1},
@@ -708,7 +710,6 @@ function getItemPeriods(item){
       return {label:`${i+1}月`, dateStart:`${y}-${m}-01`, dateEnd:`${y}-${m}-${lastDay}`, periodIdx:i};
     });
   }
-  // irregular - single period from item dates
   return [{label:'', dateStart:item.dateStart, dateEnd:item.dateEnd, periodIdx:0}];
 }
 
