@@ -826,16 +826,24 @@ function renderOverview(){
       // count done for this period
       let pd=0,pt=i.depts.length;
       for(const dp of i.depts){ if(sDone(getEff(i,dp,p.periodIdx)))pd++; }
-      let dlabel,dcls;
-      if(over){dlabel=`逾期${Math.abs(dd)}天`;dcls='days-over';}
-      else if(notStarted){dlabel=`${daysDiff(p.dateStart)}天後開始`;dcls='days-ok';}
-      else if(dd===0){dlabel='今日截止';dcls='days-warn';}
-      else if(dd<=3){dlabel=`還有${dd}天`;dcls='days-warn';}
-      else{dlabel=`還有${dd}天`;dcls='days-ok';}
+      let dlabel,dcls,sortOrder;
+      if(over){
+        dlabel=`逾期${Math.abs(dd)}天`;dcls='days-over';
+        sortOrder=20000+Math.abs(dd); // 逾期排最後，逾期越久越後
+      } else if(notStarted){
+        dlabel=`${daysDiff(p.dateStart)}天後開始`;dcls='days-ok';
+        sortOrder=10000+daysDiff(p.dateStart); // 未開始排中間，越快開始越前
+      } else if(dd===0){
+        dlabel='今日截止';dcls='days-warn';sortOrder=0;
+      } else if(dd<=3){
+        dlabel=`還有${dd}天結束`;dcls='days-warn';sortOrder=dd;
+      } else {
+        dlabel=`還有${dd}天結束`;dcls='days-ok';sortOrder=dd;
+      }
       const bc=over?'ub-over':isNoticeType?'ub-notice':'ub-submit';
       const col=i.column||'common';
       const pLabel=periods.length>1?` (${p.label})`:'';
-      alertItems.push({col, html:`<div class="up-item">
+      alertItems.push({col, sortOrder, html:`<div class="up-item">
         <span class="up-badge ${bc}">${TYPE_LABEL[i.type]}</span>
         <div style="flex:1;"><div class="up-name">${i.name}${pLabel}</div>
         <div class="up-meta">截止 ${fmt(p.dateEnd)}・完成 ${pd}/${pt} 職類</div></div>
@@ -845,6 +853,7 @@ function renderOverview(){
   }
 
   const colGroups={common:[],doctor:[],medical:[]};
+  alertItems.sort((a,b)=>a.sortOrder-b.sortOrder);
   alertItems.forEach(a=>{ if(colGroups[a.col]) colGroups[a.col].push(a.html); else colGroups.common.push(a.html); });
   const empty='<div style="color:var(--text3);font-size:12px;text-align:center;padding:16px 0">無項目</div>';
   const alertsHtml=`<div class="alerts-grid">
