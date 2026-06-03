@@ -538,7 +538,7 @@ let G = {
   editId: null,
   // GitHub config (stored separately in localStorage, never in Excel)
   cfg: { user:'', repo:'', path:'tracking_data.xlsx', token:'',
-         adminUser:'admin', adminPass:'1234' },  // 預設帳密，請在設定頁修改
+         adminUser:'admin', adminPass:'5678' },  // 預設帳密，請在設定頁修改
   // runtime
   fileSha: '',
   dirty: false,
@@ -1103,17 +1103,22 @@ function openPicker(e,itemId,dept,trackMode,isNotice,periodIdx=0){
   }
   document.getElementById('spOpts').innerHTML=html;
   const sp=document.getElementById('spBox');
-  sp.style.display='block'; document.getElementById('spOv').style.display='block';
+  sp.style.display='block';
+  sp.style.visibility='hidden'; // 先隱藏計算高度
+  document.getElementById('spOv').style.display='block';
   const r=e.currentTarget.getBoundingClientRect();
-  const spH=sp.offsetHeight||180;
-  const spW=sp.offsetWidth||200;
-  // 判斷下方空間是否足夠
-  const belowSpace=window.innerHeight-r.bottom;
-  const topPos=belowSpace>=spH+8
-    ? r.bottom+scrollY+4          // 下方放得下 → 往下
-    : r.top+scrollY-spH-4;        // 下方不夠 → 往上
-  sp.style.top=topPos+'px';
-  sp.style.left=Math.min(Math.max(r.left,8),window.innerWidth-spW-8)+'px';
+  // 等 DOM 渲染後再計算位置
+  requestAnimationFrame(()=>{
+    const spH=sp.offsetHeight;
+    const spW=sp.offsetWidth||210;
+    const belowSpace=window.innerHeight-r.bottom;
+    const topPos=belowSpace>=spH+8
+      ? r.bottom+window.scrollY+4
+      : r.top+window.scrollY-spH-4;
+    sp.style.top=Math.max(topPos, window.scrollY+4)+'px';
+    sp.style.left=Math.min(Math.max(r.left,8),window.innerWidth-spW-8)+'px';
+    sp.style.visibility='visible';
+  });
 }
 function closePicker(){ document.getElementById('spBox').style.display='none'; document.getElementById('spOv').style.display='none'; _pc=null; }
 function setStatus(s){
