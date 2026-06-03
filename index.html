@@ -163,6 +163,7 @@ select{background:var(--surface2);border:1px solid var(--border);color:var(--tex
 .dtag .rm{cursor:pointer;color:var(--text3);font-size:16px;line-height:1;}.dtag .rm:hover{color:var(--red);}
 .add-row{display:flex;gap:8px;margin-top:10px;}
 
+.tb-freq{background:#1c2a2a;color:#56d364;border:1px solid #238636;}
 /* LOGIN MODAL */
 .login-overlay{position:fixed;inset:0;background:rgba(0,0,0,.85);display:flex;align-items:center;justify-content:center;z-index:500;backdrop-filter:blur(6px);}
 .login-overlay.h{display:none;}
@@ -366,13 +367,26 @@ select{background:var(--surface2);border:1px solid var(--border);color:var(--tex
         <div class="hint">最終截止/配合期限</div>
       </div>
     </div>
-    <div class="fg" id="trackModeSection">
-      <label class="flabel">追蹤模式</label>
-      <select class="fi" id="fTrackMode">
-        <option value="simple">模式一：簡單勾選（未完成／已完成）</option>
-        <option value="date">模式二：填完成日期</option>
-      </select>
-      <div class="hint">逾期未完成皆自動標示；公告配合類型不適用此設定</div>
+    <div class="frow">
+      <div class="fg" style="flex:1;">
+        <label class="flabel">頻率標籤</label>
+        <select class="fi" id="fFreq">
+          <option value="">無</option>
+          <option value="yearly">🔁 每年</option>
+          <option value="halfyear">🔁 每半年</option>
+          <option value="quarterly">🔁 每季</option>
+          <option value="monthly">🔁 每月</option>
+          <option value="irregular">📌 不定期</option>
+        </select>
+      </div>
+      <div class="fg" style="flex:1;" id="trackModeSection">
+        <label class="flabel">追蹤模式</label>
+        <select class="fi" id="fTrackMode">
+          <option value="simple">模式一：簡單勾選</option>
+          <option value="date">模式二：填完成日期</option>
+        </select>
+        <div class="hint">公告類型不適用</div>
+      </div>
     </div>
     <div class="fg">
       <label class="flabel">是否為臨時項目</label>
@@ -766,7 +780,7 @@ function renderMatrix(){
       const bl=over?'border-left:3px solid var(--red)':active?'border-left:3px solid var(--green)':'';
       const dc=item.dateEnd&&daysDiff(item.dateEnd)<=3&&!over?'color:var(--warn)':over?'color:var(--red)':'color:var(--text3)';
       r+=`<tr><td class="icell" style="${bl}">
-        <div class="item-name">${item.name}${item.temp?'<span class="tbadge tb-temp" style="margin-left:5px">臨時</span>':''}</div>
+        <div class="item-name">${item.name}${item.temp?'<span class="tbadge tb-temp" style="margin-left:5px">臨時</span>':''}${item.freq?`<span class="tbadge tb-freq" style="margin-left:3px">🔁 ${{yearly:'每年',halfyear:'每半年',quarterly:'每季',monthly:'每月',irregular:'不定期'}[item.freq]||item.freq}</span>`:''}</div>
         <div><span class="tbadge ${item.type==='data'?'tb-data':item.type==='file'?'tb-file':'tb-notice'}">${TYPE_LABEL[item.type]}</span>
         <span class="item-meta" style="${dc}">${fmt(item.dateStart)}～${fmt(item.dateEnd)}</span></div>
         ${item.note?`<div style="font-size:10px;color:var(--text3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:210px" title="${item.note}">💬 ${item.note}</div>`:''}
@@ -857,7 +871,7 @@ function renderItems(){
         const {done:d,total:t}=doneCount(item);
         return `<div class="irow ${item.type==='notice'?'notice-row':''}">
           <div class="iinfo">
-            <div class="iname">${item.name}${item.temp?'<span class="tbadge tb-temp" style="margin-left:8px">臨時</span>':''}${tag}</div>
+            <div class="iname">${item.name}${item.temp?'<span class="tbadge tb-temp" style="margin-left:8px">臨時</span>':''}${item.freq?`<span class="tbadge tb-freq" style="margin-left:6px">🔁 ${{yearly:'每年',halfyear:'每半年',quarterly:'每季',monthly:'每月',irregular:'不定期'}[item.freq]||item.freq}</span>`:''}${tag}</div>
             <div class="imeta">📅 ${item.dateStart} ～ ${item.dateEnd}</div>
             <div class="imeta">職類：${item.depts.join('、')}</div>
             <div class="imeta">完成 ${d}/${t} 職類${item.note?' ・ 💬 '+item.note:''}</div>
@@ -884,6 +898,7 @@ function openItemModal(id=null){
     const item=G.items.find(i=>i.id===id); if(!item)return;
     document.getElementById('fName').value=item.name;
     document.getElementById('fType2').value=item.type;
+    document.getElementById('fFreq').value=item.freq||'';
     document.getElementById('fTrackMode').value=item.trackMode||'simple';
     document.getElementById('fTemp').value=item.temp?'1':'0';
     document.getElementById('fStart').value=item.dateStart||'';
@@ -893,7 +908,8 @@ function openItemModal(id=null){
   } else {
     ['fName','fNote'].forEach(id=>document.getElementById(id).value='');
     document.getElementById('fType2').value='data';
-    document.getElementById('fTemp').value='0';
+    document.getElementById('fFreq').value='';
+    document.getElementById('fTrackMode').value='simple';
     const y=G.year;
     document.getElementById('fStart').value=`${y}-01-01`;
     document.getElementById('fEnd').value=`${y}-01-31`;
@@ -911,7 +927,7 @@ function saveItem(){
   if(ds>de){toast('截止日期需晚於開始日期');return;}
   const depts=[...document.querySelectorAll('#deptCbs input:checked')].map(el=>el.value);
   if(!depts.length){toast('請選擇適用職類');return;}
-  const data={name,type:document.getElementById('fType2').value,trackMode:document.getElementById('fTrackMode').value,temp:document.getElementById('fTemp').value==='1',dateStart:ds,dateEnd:de,depts,note:document.getElementById('fNote').value.trim()};
+  const data={name,type:document.getElementById('fType2').value,trackMode:document.getElementById('fTrackMode').value,freq:document.getElementById('fFreq').value,temp:document.getElementById('fTemp').value==='1',dateStart:ds,dateEnd:de,depts,note:document.getElementById('fNote').value.trim()};
   if(G.editId){ const idx=G.items.findIndex(i=>i.id===G.editId); if(idx>=0)G.items[idx]={...G.items[idx],...data}; toast('已更新'); }
   else{ G.items.push({id:genId(),...data}); toast('已新增'); }
   markDirty(); closeModal(); renderItems();
