@@ -1264,16 +1264,20 @@ function buildExcel(){
   XLSX.utils.book_append_sheet(wb, ws1, '追蹤矩陣');
 
   // Sheet2: 項目設定
-  const hdr2 = ['#','項目名稱','類型','追蹤模式','臨時','開始日期','截止日期','適用職類','備註'];
+  const hdr2 = ['#','項目名稱','類型','追蹤模式','頻率','顯示欄位','臨時','開始日期','截止日期','適用職類','備註'];
+  const freqMap={yearly:'每年',halfyear:'每半年',quarterly:'每季',monthly:'每月',irregular:'不定期'};
+  const colMap={common:'通用',doctor:'醫師',medical:'醫事人員'};
   const rows2 = [hdr2, ...G.items.map((item,i)=>[
     i+1, item.name,
     {data:'填數據',file:'繳資料',notice:'公告配合'}[item.type],
     item.type==='notice'?'公告':(item.trackMode==='date'?'填完成日期':'簡單勾選'),
+    freqMap[item.freq]||'',
+    colMap[item.column]||'通用',
     item.temp?'是':'否', item.dateStart, item.dateEnd,
     item.depts.join('、'), item.note||''
   ])];
   const ws2 = XLSX.utils.aoa_to_sheet(rows2);
-  ws2['!cols']=[{wch:4},{wch:22},{wch:10},{wch:6},{wch:12},{wch:12},{wch:40},{wch:30}];
+  ws2['!cols']=[{wch:4},{wch:22},{wch:10},{wch:10},{wch:8},{wch:10},{wch:6},{wch:12},{wch:12},{wch:40},{wch:30}];
   XLSX.utils.book_append_sheet(wb, ws2, '項目設定');
 
   // Sheet3: 職類清單
@@ -1307,18 +1311,24 @@ function parseExcel(b64){
   }
 
   // 讀項目設定
+  // 欄位順序: # | 項目名稱 | 類型 | 追蹤模式 | 頻率 | 顯示欄位 | 臨時 | 開始日期 | 截止日期 | 適用職類 | 備註
   if(wb.SheetNames.includes('項目設定')){
     const ws = wb.Sheets['項目設定'];
     const rows = XLSX.utils.sheet_to_json(ws, {header:1}).slice(1);
+    const freqRevMap={'每年':'yearly','每半年':'halfyear','每季':'quarterly','每月':'monthly','不定期':'irregular'};
+    const colRevMap={'通用':'common','醫師':'doctor','醫事人員':'medical'};
     G.items = rows.filter(r=>r[1]).map((r,idx)=>({
-      id: 'e'+idx+'_'+(r[1]||'').slice(0,6).replace(/\s/g,''),
-      name: String(r[1]||''),
-      type: r[2]==='公告配合'?'notice':r[2]==='繳資料'?'file':'data',
-      temp: r[3]==='是',
-      dateStart: r[4]||'',
-      dateEnd:   r[5]||'',
-      depts: String(r[6]||'').split('、').filter(Boolean),
-      note:  String(r[7]||''),
+      id:        'e'+idx+'_'+(r[1]||'').slice(0,6).replace(/\s/g,''),
+      name:      String(r[1]||''),
+      type:      r[2]==='公告配合'?'notice':r[2]==='繳資料'?'file':'data',
+      trackMode: r[3]==='填完成日期'?'date':'simple',
+      freq:      freqRevMap[r[4]]||'',
+      column:    colRevMap[r[5]]||'common',
+      temp:      r[6]==='是',
+      dateStart: r[7]||'',
+      dateEnd:   r[8]||'',
+      depts:     String(r[9]||'').split('、').filter(Boolean),
+      note:      String(r[10]||''),
     }));
   }
 
