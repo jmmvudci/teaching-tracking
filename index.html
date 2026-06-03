@@ -877,13 +877,11 @@ function renderSettings(){
   document.getElementById('cfgAdminUser').value = G.cfg.adminUser || 'admin';
   document.getElementById('cfgAdminPass').value = '';
   document.getElementById('cfgAdminPass2').value = '';
-  // fill cfg fields
-  ['cfgUser','cfgRepo','cfgPath','cfgToken'].forEach(id=>{
-    const key=id.replace('cfg','').toLowerCase();
-    const map={cfguser:'user',cfgrepo:'repo',cfgpath:'path',cfgtoken:'token'};
-    const el=document.getElementById(id);
-    if(el) el.value=G.cfg[map[id.toLowerCase()]]||'';
-  });
+  // fill cfg fields (直接對應，不用 mapping)
+  document.getElementById('cfgUser').value  = G.cfg.user  || '';
+  document.getElementById('cfgRepo').value  = G.cfg.repo  || '';
+  document.getElementById('cfgPath').value  = G.cfg.path  || 'tracking_data.xlsx';
+  document.getElementById('cfgToken').value = G.cfg.token || '';
   // dept tags
   document.getElementById('deptTags').innerHTML=G.depts.map((d,i)=>
     `<div class="dtag">${d}<span class="rm" onclick="removeDept(${i})">×</span></div>`).join('');
