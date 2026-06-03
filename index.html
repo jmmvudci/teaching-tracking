@@ -40,22 +40,7 @@ body{font-family:'Noto Sans TC',sans-serif;background:var(--bg);color:var(--text
 .main{padding:24px;max-width:1500px;margin:0 auto;}
 .panel{display:none;}.panel.active{display:block;}
 
-/* SETUP BANNER */
-.setup-banner{background:#1c2430;border:1px solid var(--accent);border-radius:var(--r-lg);padding:24px;margin-bottom:24px;}
-.setup-banner h3{color:var(--accent);font-size:15px;margin-bottom:16px;}
-.setup-steps{display:flex;flex-direction:column;gap:12px;}
-.setup-step{display:flex;align-items:flex-start;gap:12px;}
-.step-num{width:24px;height:24px;border-radius:50%;background:var(--accent);color:#fff;font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px;}
-.step-body{flex:1;}
-.step-label{font-size:13px;font-weight:600;color:var(--text);margin-bottom:4px;}
-.step-desc{font-size:12px;color:var(--text2);}
-.setup-input-row{display:flex;gap:8px;margin-top:8px;flex-wrap:wrap;}
-.setup-input{background:var(--surface2);border:1px solid var(--border);color:var(--text);padding:7px 12px;border-radius:var(--r-sm);font-family:'DM Mono';font-size:13px;flex:1;min-width:200px;}
-.setup-input:focus{outline:none;border-color:var(--accent);}
-.step-status{font-size:11px;margin-top:4px;}
-.step-ok{color:var(--green);} .step-err{color:var(--red);}
-
-/* KPI */
+/* SETTINGS */
 .kpi-row{display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin-bottom:20px;}
 .kpi{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);padding:20px;}
 .kpi-label{font-size:10px;color:var(--text3);letter-spacing:.08em;text-transform:uppercase;margin-bottom:8px;}
@@ -230,7 +215,6 @@ select{background:var(--surface2);border:1px solid var(--border);color:var(--tex
 
 <!-- ══ OVERVIEW ══ -->
 <div class="panel active" id="panel-overview">
-  <div id="setupBanner"></div>
   <div id="overviewContent"></div>
 </div>
 
@@ -628,29 +612,7 @@ function renderOverview(){
   const yi = yearItems();
 
   // setup banner
-  const hasCfg = G.cfg.user && G.cfg.repo && G.cfg.token;
-  document.getElementById('setupBanner').innerHTML = hasCfg ? '' : `
-    <div class="setup-banner">
-      <h3>🔧 首次使用 - 請先完成 GitHub 連線設定</h3>
-      <div class="setup-steps">
-        <div class="setup-step"><div class="step-num">1</div><div class="step-body">
-          <div class="step-label">建立 GitHub Repository</div>
-          <div class="step-desc">在 GitHub 建立一個新的 repo（可設為 Private），將 <code>tracking_data.xlsx</code> 和 <code>index.html</code> 上傳進去</div>
-        </div></div>
-        <div class="setup-step"><div class="step-num">2</div><div class="step-body">
-          <div class="step-label">開啟 GitHub Pages</div>
-          <div class="step-desc">repo → Settings → Pages → Source 選 main branch → Save。之後用 <code>https://你的帳號.github.io/repo名稱</code> 開啟</div>
-        </div></div>
-        <div class="setup-step"><div class="step-num">3</div><div class="step-body">
-          <div class="step-label">產生 Personal Access Token</div>
-          <div class="step-desc">GitHub → Settings → Developer settings → Personal access tokens → Fine-grained tokens → 產生 Token，勾選此 repo 的 Contents 讀寫權限</div>
-        </div></div>
-        <div class="setup-step"><div class="step-num">4</div><div class="step-body">
-          <div class="step-label">填入設定</div>
-          <div class="step-desc">到上方「⚙️ 設定」頁填入帳號、repo名稱、Token，按儲存後即可使用</div>
-        </div></div>
-      </div>
-    </div>`;
+  document.getElementById('setupBanner').innerHTML = '';
 
   // KPI
   let total=0,done=0,pend=0,abn=0,nt=0,nd=0;
