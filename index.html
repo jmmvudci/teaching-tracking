@@ -52,6 +52,7 @@ body{font-family:'Noto Sans TC',sans-serif;background:var(--bg);color:var(--text
 
 /* CARDS */
 .grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px;}
+.grid2 .card[style*="grid-column"]{width:100%;}
 .card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);padding:20px;}
 .card-title{font-size:13px;font-weight:600;margin-bottom:16px;display:flex;align-items:center;gap:8px;}
 .dot{width:6px;height:6px;border-radius:50%;background:var(--accent);flex-shrink:0;}
@@ -163,6 +164,9 @@ select{background:var(--surface2);border:1px solid var(--border);color:var(--tex
 .dtag .rm{cursor:pointer;color:var(--text3);font-size:16px;line-height:1;}.dtag .rm:hover{color:var(--red);}
 .add-row{display:flex;gap:8px;margin-top:10px;}
 
+.alerts-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;}
+.alerts-col{}
+.alerts-col-title{font-size:11px;font-weight:700;color:var(--text3);letter-spacing:.08em;text-transform:uppercase;margin-bottom:8px;padding-bottom:6px;border-bottom:1px solid var(--border2);}
 .tb-freq{background:#1c2a2a;color:#56d364;border:1px solid #238636;}
 /* LOGIN MODAL */
 .login-overlay{position:fixed;inset:0;background:rgba(0,0,0,.85);display:flex;align-items:center;justify-content:center;z-index:500;backdrop-filter:blur(6px);}
@@ -185,6 +189,7 @@ select{background:var(--surface2);border:1px solid var(--border);color:var(--tex
 @media(max-width:800px){
   .kpi-row{grid-template-columns:repeat(2,1fr);}
   .grid2{grid-template-columns:1fr;}
+  .alerts-grid{grid-template-columns:1fr;}
   .main,.topbar,.tabs{padding-left:12px;padding-right:12px;}
 }
 </style>
@@ -387,6 +392,14 @@ select{background:var(--surface2);border:1px solid var(--border);color:var(--tex
         </select>
         <div class="hint">公告類型不適用</div>
       </div>
+    </div>
+    <div class="fg">
+      <label class="flabel">總覽顯示欄位</label>
+      <select class="fi" id="fColumn">
+        <option value="common">📋 通用</option>
+        <option value="doctor">👨‍⚕️ 醫師</option>
+        <option value="medical">🏥 醫事人員</option>
+      </select>
     </div>
     <div class="fg">
       <label class="flabel">是否為臨時項目</label>
@@ -637,7 +650,7 @@ function today(){ return new Date().toISOString().slice(0,10); }
 function isActive(i){ const t=today(); return i.dateStart<=t && t<=i.dateEnd; }
 function isOverdue(i){ return today()>i.dateEnd; }
 function isUpcoming(i,days=30){ return i.dateStart>today() && daysDiff(i.dateStart)<=days; }
-function yearItems(){ const y=String(G.year); return G.items.filter(i=>(i.dateStart||'').startsWith(y)||(i.dateEnd||'').startsWith(y)); }
+function yearItems(){ const y=String(G.year); return G.items.filter(i=>(i.dateStart||'').startsWith(y)); }
 function doneCount(item){ let d=0; for(const dp of item.depts){ if(isDone(item,dp))d++; } return {done:d,total:item.depts.length}; }
 
 function markDirty(){
@@ -693,13 +706,12 @@ function renderOverview(){
   const pct=total?Math.round(done/total*100):0;
   const npct=nt?Math.round(nd/nt*100):0;
 
-  // upcoming
-  const alerts = yi
+  // upcoming - build alert item HTML
+  const alertItems = yi
     .filter(i=>i.type==='notice' || isActive(i)||isOverdue(i)||isUpcoming(i,30))
     .map(i=>{
       const dd=daysDiff(i.dateEnd); const {done:d,total:t}=doneCount(i);
-      const over=isOverdue(i);
-      const notStarted=i.dateStart>today();
+      const over=isOverdue(i); const notStarted=i.dateStart>today();
       let dlabel,dcls;
       if(over){dlabel=`逾期${Math.abs(dd)}天`;dcls='days-over';}
       else if(notStarted){dlabel=`${daysDiff(i.dateStart)}天後開始`;dcls='days-ok';}
@@ -707,13 +719,23 @@ function renderOverview(){
       else if(dd<=3){dlabel=`還有${dd}天`;dcls='days-warn';}
       else{dlabel=`還有${dd}天`;dcls='days-ok';}
       const bc=over?'ub-over':i.type==='notice'?'ub-notice':'ub-submit';
-      return `<div class="up-item">
+      const col=i.column||'common';
+      return {col, html:`<div class="up-item">
         <span class="up-badge ${bc}">${TYPE_LABEL[i.type]}</span>
         <div style="flex:1;"><div class="up-name">${i.name}</div>
         <div class="up-meta">截止 ${fmt(i.dateEnd)}・完成 ${d}/${t} 職類</div></div>
         <div class="up-days ${dcls}">${dlabel}</div>
-      </div>`;
-    }).slice(0,12);
+      </div>`};
+    });
+
+  const colGroups={common:[],doctor:[],medical:[]};
+  alertItems.forEach(a=>{ if(colGroups[a.col]) colGroups[a.col].push(a.html); else colGroups.common.push(a.html); });
+  const empty='<div style="color:var(--text3);font-size:12px;text-align:center;padding:16px 0">無項目</div>';
+  const alertsHtml=`<div class="alerts-grid">
+    <div class="alerts-col"><div class="alerts-col-title">📋 通用</div><div class="upcoming-list">${colGroups.common.join('')||empty}</div></div>
+    <div class="alerts-col"><div class="alerts-col-title">👨‍⚕️ 醫師</div><div class="upcoming-list">${colGroups.doctor.join('')||empty}</div></div>
+    <div class="alerts-col"><div class="alerts-col-title">🏥 醫事人員</div><div class="upcoming-list">${colGroups.medical.join('')||empty}</div></div>
+  </div>`;
 
   // dept progress
   const drows = G.depts.map(dp=>{
@@ -738,8 +760,8 @@ function renderOverview(){
     </div>
     <div class="grid2">
       <div class="card"><div class="card-title"><span class="dot"></span>各職類完成進度</div>${drows.join('')||'<div style="color:var(--text3)">尚無職類</div>'}</div>
-      <div class="card"><div class="card-title"><span class="dot" style="background:var(--warn)"></span>即將到期 / 逾期項目</div>
-        <div class="upcoming-list">${alerts.join('')||'<div style="color:var(--text3);font-size:13px;text-align:center;padding:20px">近期無待辦項目</div>'}</div>
+      <div class="card" style="grid-column:1/-1"><div class="card-title"><span class="dot" style="background:var(--warn)"></span>即將到期 / 逾期項目</div>
+        ${alertsHtml}
       </div>
     </div>`;
 }
@@ -900,6 +922,7 @@ function openItemModal(id=null){
     document.getElementById('fType2').value=item.type;
     document.getElementById('fFreq').value=item.freq||'';
     document.getElementById('fTrackMode').value=item.trackMode||'simple';
+    document.getElementById('fColumn').value=item.column||'common';
     document.getElementById('fTemp').value=item.temp?'1':'0';
     document.getElementById('fStart').value=item.dateStart||'';
     document.getElementById('fEnd').value=item.dateEnd||'';
@@ -910,6 +933,7 @@ function openItemModal(id=null){
     document.getElementById('fType2').value='data';
     document.getElementById('fFreq').value='';
     document.getElementById('fTrackMode').value='simple';
+    document.getElementById('fColumn').value='common';
     const y=G.year;
     document.getElementById('fStart').value=`${y}-01-01`;
     document.getElementById('fEnd').value=`${y}-01-31`;
@@ -927,7 +951,7 @@ function saveItem(){
   if(ds>de){toast('截止日期需晚於開始日期');return;}
   const depts=[...document.querySelectorAll('#deptCbs input:checked')].map(el=>el.value);
   if(!depts.length){toast('請選擇適用職類');return;}
-  const data={name,type:document.getElementById('fType2').value,trackMode:document.getElementById('fTrackMode').value,freq:document.getElementById('fFreq').value,temp:document.getElementById('fTemp').value==='1',dateStart:ds,dateEnd:de,depts,note:document.getElementById('fNote').value.trim()};
+  const data={name,type:document.getElementById('fType2').value,trackMode:document.getElementById('fTrackMode').value,freq:document.getElementById('fFreq').value,column:document.getElementById('fColumn').value||'common',temp:document.getElementById('fTemp').value==='1',dateStart:ds,dateEnd:de,depts,note:document.getElementById('fNote').value.trim()};
   if(G.editId){ const idx=G.items.findIndex(i=>i.id===G.editId); if(idx>=0)G.items[idx]={...G.items[idx],...data}; toast('已更新'); }
   else{ G.items.push({id:genId(),...data}); toast('已新增'); }
   markDirty(); closeModal(); renderItems();
