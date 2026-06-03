@@ -112,6 +112,7 @@ select{background:#fff;border:1px solid #e2e8f0;color:#2d3748;padding:6px 10px;b
 .scell-ro{text-align:center;min-width:80px;opacity:.8;}
 .spill{display:inline-flex;align-items:center;justify-content:center;padding:3px 8px;border-radius:99px;font-size:11px;font-weight:500;min-width:62px;transition:filter .15s;white-space:nowrap;}
 .s0{background:#f7fafc;color:#718096;border:1px solid #e2e8f0;}
+.sna{background:#f7fafc;color:#a0aec0;border:1px solid #e2e8f0;font-style:italic;}
 .s1{background:#ebf8ff;color:#2b6cb0;border:1px solid #bee3f8;}
 .s2{background:#f0fff4;color:#276749;border:1px solid #9ae6b4;}
 .s3{background:#fffff0;color:#975a16;border:1px solid #faf089;}
@@ -498,6 +499,7 @@ function sLabel(s){
   if(s===0) return '未完成';
   if(s==='done') return '已完成';
   if(s==='overdue') return '逾期未完成';
+  if(s==='na') return '無學員';
   if(s===5) return '已配合';
   if(s===3) return '待確認';
   if(s===4) return '異常';
@@ -509,6 +511,7 @@ function sLabel(s){
 }
 function sClass(s){
   if(s===0) return 's0';
+  if(s==='na') return 'sna';
   if(s==='done'||(typeof s==='string'&&s.match(/^\d{4}-\d{2}-\d{2}$/))) return 's2';
   if(s==='overdue'||s===4) return 's4';
   if(s===5) return 's5';
@@ -516,6 +519,7 @@ function sClass(s){
   return 's0';
 }
 function sDone(s){ return s==='done'||s===5||(typeof s==='string'&&s.match(/^\d{4}-\d{2}-\d{2}$/)); }
+function sNA(s){ return s==='na'; }
 
 // legacy wrappers (single-period items)
 function getEffectiveStatus(item,dept){ return getEff(item,dept,0); }
@@ -548,7 +552,13 @@ const DEPT_SESSION_KEY  = 'ats_dept_session';  // stores dept name
 
 function isAdmin(){ return sessionStorage.getItem(ADMIN_SESSION_KEY) === 'true'; }
 function currentDept(){ return sessionStorage.getItem(DEPT_SESSION_KEY) || null; }
-function canEditDept(dept){ return isAdmin() || currentDept() === dept; }
+// canEditDept: if not logged in, allow click (will prompt login); if logged in as dept, restrict to own dept; admin can edit all
+function canEditDept(dept){
+  if(isAdmin()) return true;
+  const cd = currentDept();
+  if(cd === null) return true; // not logged in - allow click, openPicker will check
+  return cd === dept;
+}
 function isLoggedIn(){ return isAdmin() || currentDept() !== null; }
 
 // open login modal - mode: 'admin' or 'dept'
@@ -614,6 +624,20 @@ function loginAsDept(dept){
   updateAuthBadge();
   toast(`已登入：${dept}`);
   renderMatrix();
+  // resume pending picker action if any
+  if(window._afterLogin){
+    const a=window._afterLogin; window._afterLogin=null;
+    if(a.dept===dept || isAdmin()){
+      setTimeout(()=>{
+        const cells=document.querySelectorAll('.scell');
+        // re-trigger via simulated context - just re-render and let user click again
+        toast(`已登入「${dept}」，請再點一次格子`);
+      },300);
+    } else {
+      toast(`您登入的是「${dept}」，無法修改「${a.dept}」的格子`);
+    }
+    window._afterLogin=null;
+  }
 }
 
 function closeLogin(){
@@ -748,8 +772,13 @@ function isUpcoming(i,days=30){ return i.dateStart>today() && daysDiff(i.dateSta
 function yearItems(){ const y=String(G.year); return G.items.filter(i=>(i.dateStart||'').startsWith(y)); }
 function doneCount(item){
   const periods=getItemPeriods(item);
-  let d=0, total=item.depts.length*periods.length;
-  for(const dp of item.depts) for(const p of periods){ if(sDone(getEff(item,dp,p.periodIdx)))d++; }
+  let d=0, total=0;
+  for(const dp of item.depts) for(const p of periods){
+    const s=getEff(item,dp,p.periodIdx);
+    if(sNA(s)) continue; // 無學員不計入分母
+    total++;
+    if(sDone(s)) d++;
+  }
   return {done:d,total};
 }
 
@@ -805,7 +834,10 @@ function renderOverview(){
     for(const dp of item.depts) for(const p of periods){
       const s=getEff(item,dp,p.periodIdx);
       if(item.type==='notice'){ nt++; if(s===5)nd++; }
-      else{ total++; if(sDone(s))done++; else if(s===3)pend++; else if(s===4||s==='overdue')abn++; }
+      else{
+        if(sNA(s)) continue; // 無學員不計入
+        total++; if(sDone(s))done++; else if(s===3)pend++; else if(s===4||s==='overdue')abn++;
+      }
     }
   }
   const pct=total?Math.round(done/total*100):0;
@@ -891,8 +923,17 @@ function renderDeptProgress(){
       if(!item.depts.includes(dp)) continue;
       const periods=getItemPeriods(item);
       for(const p of periods){
-        total++;
         const s=getEff(item,dp,p.periodIdx);
+        if(sNA(s)){
+          // 無學員 - show in list but don't count
+          const pLabel=periods.length>1?` (${p.label})`:'';
+          itemRows.push(`<div style="display:flex;align-items:center;justify-content:space-between;padding:5px 0;border-bottom:1px solid #f7fafc;gap:8px;">
+            <div style="font-size:12px;color:#4a5568;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${item.name}${pLabel}">${item.name}${pLabel}</div>
+            <span class="spill sna" style="font-size:10px;padding:2px 7px;min-width:52px;">無學員</span>
+          </div>`);
+          continue;
+        }
+        total++;
         const isDoneVal=sDone(s);
         if(isDoneVal) done++;
         const sLbl=sLabel(s); const sCls=sClass(s);
@@ -1024,7 +1065,20 @@ function renderMatrix(){
 // ══════════════════════════════════════════
 let _pc=null;
 function openPicker(e,itemId,dept,trackMode,isNotice,periodIdx=0){
-  e.stopPropagation(); _pc={itemId,dept,trackMode,periodIdx};
+  e.stopPropagation();
+  // if logged in as dept and not own dept, block
+  const cd=currentDept();
+  if(cd!==null && !isAdmin() && cd!==dept){
+    toast(`您登入的是「${cd}」，無法修改其他職類`);
+    return;
+  }
+  // if not logged in, prompt login then return
+  if(!isAdmin() && cd===null){
+    window._afterLogin={itemId,dept,trackMode,isNotice,periodIdx};
+    openLoginModal('dept');
+    return;
+  }
+  _pc={itemId,dept,trackMode,periodIdx};
   let html='';
   if(isNotice){
     html=S_NOTICE.map(s=>{
@@ -1034,11 +1088,12 @@ function openPicker(e,itemId,dept,trackMode,isNotice,periodIdx=0){
   } else if(trackMode==='date'){
     html=`
       <div class="sp-item" onclick="setStatus(0)"><span class="spill s0">未完成</span></div>
-      <div style="padding:8px 10px;">
-        <div style="font-size:11px;color:var(--text2);margin-bottom:5px;">填入完成日期</div>
+      <div class="sp-item" onclick="setStatus('na')"><span class="spill s3" style="background:#f7fafc;color:#a0aec0;border-color:#e2e8f0;">無學員</span></div>
+      <div style="padding:8px 10px;border-top:1px solid #f0f4f8;">
+        <div style="font-size:11px;color:#4a5568;margin-bottom:5px;">填入完成日期</div>
         <div style="display:flex;gap:6px;align-items:center;">
-          <input type="date" id="spDateInput" style="background:var(--surface3);border:1px solid var(--border);color:var(--text);padding:4px 8px;border-radius:var(--r-sm);font-size:12px;flex:1;" value="${new Date().toISOString().slice(0,10)}">
-          <button onclick="setStatus('DATE')" style="background:var(--accent);color:#fff;border:none;padding:4px 10px;border-radius:var(--r-sm);cursor:pointer;font-size:12px;">確認</button>
+          <input type="date" id="spDateInput" style="background:#fff;border:1px solid #e2e8f0;color:#2d3748;padding:4px 8px;border-radius:var(--r-sm);font-size:12px;flex:1;" value="${new Date().toISOString().slice(0,10)}">
+          <button onclick="setStatus('DATE')" style="background:#2b6cb0;color:#fff;border:none;padding:4px 10px;border-radius:var(--r-sm);cursor:pointer;font-size:12px;">確認</button>
         </div>
       </div>`;
   } else {
