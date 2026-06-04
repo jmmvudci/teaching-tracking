@@ -71,6 +71,7 @@ body{font-family:'Noto Sans TC',sans-serif;background:var(--bg);color:var(--text
 
 /* UPCOMING */
 .alerts-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;}
+.alerts-grid-2{display:grid;grid-template-columns:1fr 1fr;gap:16px;}
 .alerts-col-title{font-size:11px;font-weight:700;color:#718096;letter-spacing:.06em;text-transform:uppercase;margin-bottom:8px;padding-bottom:6px;border-bottom:2px solid #e2e8f0;}
 .upcoming-list{display:flex;flex-direction:column;gap:6px;}
 .up-item{display:flex;align-items:flex-start;gap:8px;padding:9px 10px;background:#f7fafc;border-radius:var(--r-md);border:1px solid #e2e8f0;}
@@ -174,6 +175,7 @@ select{background:#fff;border:1px solid #e2e8f0;color:#2d3748;padding:6px 10px;b
 .add-row{display:flex;gap:8px;margin-top:10px;}
 
 .alerts-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;}
+.alerts-grid-2{display:grid;grid-template-columns:1fr 1fr;gap:16px;}
 .alerts-col{}
 .alerts-col-title{font-size:11px;font-weight:700;color:var(--text3);letter-spacing:.08em;text-transform:uppercase;margin-bottom:8px;padding-bottom:6px;border-bottom:1px solid var(--border2);}
 .tb-freq{background:#1c2a2a;color:#56d364;border:1px solid #238636;}
@@ -237,12 +239,26 @@ select{background:#fff;border:1px solid #e2e8f0;color:#2d3748;padding:6px 10px;b
 
 <!-- ══ DEPT PROGRESS ══ -->
 <div class="panel" id="panel-deptprogress">
+  <div style="display:flex;align-items:center;gap:8px;margin-bottom:16px;">
+    <span class="tlabel">職類篩選</span>
+    <select id="deptGroupFilter" onchange="renderDeptProgress()">
+      <option value="all">全部</option>
+      <option value="doctor">👨‍⚕️ 醫師</option>
+      <option value="medical">🏥 醫事職類</option>
+    </select>
+  </div>
   <div id="deptProgressContent"></div>
 </div>
 
 <!-- ══ MATRIX ══ -->
 <div class="panel" id="panel-matrix">
   <div class="matrix-toolbar">
+    <span class="tlabel">職類篩選</span>
+    <select id="fDeptGroup" onchange="renderMatrix()">
+      <option value="all">全部</option>
+      <option value="doctor">👨‍⚕️ 醫師</option>
+      <option value="medical">🏥 醫事職類</option>
+    </select>
     <span class="tlabel">類型</span>
     <select id="fType" onchange="renderMatrix()">
       <option value="all">全部</option>
@@ -493,6 +509,16 @@ const DEFAULT_DEPTS = [
 //   'overdue' = 逾期未完成(自動), 5 = 已配合(公告), 3 = 待確認, 4 = 異常
 const S_NOTICE = [0,5,3,4];
 const TYPE_LABEL = {data:'📊 數據',file:'📁 資料',notice:'📢 公告'};
+const MEDICAL_DEPTS = ['藥師','醫事放射師','醫師檢驗師','護理師','營養師','呼吸治療師','物理治療師','職能治療師','臨床心理師'];
+function isDoctorDept(d){ return !MEDICAL_DEPTS.includes(d) && d!=='' && d.includes('醫師') || d.includes('醫師'); }
+function isMedicalDept(d){ return MEDICAL_DEPTS.includes(d); }
+// filter depts by group
+function filterDepts(depts, group){
+  if(group==='all') return depts;
+  if(group==='doctor') return depts.filter(d=>!MEDICAL_DEPTS.includes(d));
+  if(group==='medical') return depts.filter(d=>MEDICAL_DEPTS.includes(d));
+  return depts;
+}
 
 // Unified status helpers - all period-aware
 function sLabel(s){
@@ -689,6 +715,9 @@ function loadCfg(){
     const c = JSON.parse(localStorage.getItem('ats_cfg')||'{}');
     Object.assign(G.cfg, c);
   }catch(e){}
+  // 若 localStorage 無帳密，使用預設（首次使用）
+  if(!G.cfg.adminUser) G.cfg.adminUser='admin';
+  if(!G.cfg.adminPass) G.cfg.adminPass='5678';
 }
 function saveLocal(){
   // save non-config state locally as fallback
@@ -888,8 +917,7 @@ function renderOverview(){
   alertItems.sort((a,b)=>a.sortOrder-b.sortOrder);
   alertItems.forEach(a=>{ if(colGroups[a.col]) colGroups[a.col].push(a.html); else colGroups.common.push(a.html); });
   const empty='<div style="color:var(--text3);font-size:12px;text-align:center;padding:16px 0">無項目</div>';
-  const alertsHtml=`<div class="alerts-grid">
-    <div class="alerts-col"><div class="alerts-col-title">📋 通用</div><div class="upcoming-list">${colGroups.common.join('')||empty}</div></div>
+  const alertsHtml=`<div class="alerts-grid-2">
     <div class="alerts-col"><div class="alerts-col-title">👨‍⚕️ 醫師</div><div class="upcoming-list">${colGroups.doctor.join('')||empty}</div></div>
     <div class="alerts-col"><div class="alerts-col-title">🏥 醫事人員</div><div class="upcoming-list">${colGroups.medical.join('')||empty}</div></div>
   </div>`;
@@ -915,7 +943,9 @@ function renderOverview(){
 // ══════════════════════════════════════════
 function renderDeptProgress(){
   const yi=yearItems();
-  const cards=G.depts.map(dp=>{
+  const group=document.getElementById('deptGroupFilter')?.value||'all';
+  const filteredDepts=filterDepts(G.depts, group);
+  const cards=filteredDepts.map(dp=>{
     // overall stats
     let done=0, total=0;
     const itemRows=[];
@@ -995,6 +1025,8 @@ function renderMatrix(){
     mwrap.innerHTML='<div style="padding:60px;text-align:center;color:var(--text3)">無符合條件的項目</div>';return;
   }
 
+  const deptGroup=document.getElementById('fDeptGroup')?.value||'all';
+  const filteredMatrixDepts=filterDepts(G.depts, deptGroup);
   const submit=items.filter(i=>i.type!=='notice');
   const notice=items.filter(i=>i.type==='notice');
 
@@ -1007,7 +1039,7 @@ function renderMatrix(){
     let r='';
     // build header: for periodic items, add sub-header per period
     const hasMultiPeriod = arr.some(i=>getItemPeriods(i).length>1);
-    if(label) r+=`<tr class="sec-hdr"><td colspan="${G.depts.length+1}">${label}</td></tr>`;
+    if(label) r+=`<tr class="sec-hdr"><td colspan="${filteredMatrixDepts.length+1}">${label}</td></tr>`;
     for(const item of arr){
       const periods=getItemPeriods(item);
       const freqLabel={yearly:'每年',halfyear:'每半年',quarterly:'每季',monthly:'每月',irregular:'不定期'};
@@ -1036,7 +1068,7 @@ function renderMatrix(){
         }
         r+=`</td>`;
 
-        for(const dp of G.depts){
+        for(const dp of filteredMatrixDepts){
           if(!item.depts.includes(dp)){r+=`<td class="nacell">—</td>`;continue;}
           const sVal=getEff(item,dp,p.periodIdx);
           const sLbl=sLabel(sVal);
@@ -1258,9 +1290,9 @@ function updateDeptCred(dept, field, val){
 }
 
 function saveDeptCreds(){
-  saveCfg();
+  saveCfg(); markDirty();
   renderSettings();
-  toast('職類帳密已儲存');
+  toast('職類帳密已儲存，請按「儲存至 GitHub」同步');
 }
 function saveConfig(){
   // admin credentials
@@ -1277,8 +1309,9 @@ function saveConfig(){
   G.cfg.repo=document.getElementById('cfgRepo').value.trim();
   G.cfg.path=document.getElementById('cfgPath').value.trim()||'tracking_data.xlsx';
   G.cfg.token=document.getElementById('cfgToken').value.trim();
-  saveCfg(); toast('設定已儲存（Token 存於本機）');
-  document.getElementById('cfgStatus').innerHTML='<span style="color:var(--green)">✓ 設定已儲存</span>';
+  saveCfg(); markDirty();
+  toast('設定已儲存，請按「儲存至 GitHub」同步帳密');
+  document.getElementById('cfgStatus').innerHTML='<span style="color:var(--green)">✓ 設定已儲存，請同步至 GitHub</span>';
 }
 async function testConnection(){
   if(!G.cfg.user||!G.cfg.repo||!G.cfg.token){toast('請先填寫並儲存設定');return;}
@@ -1364,12 +1397,35 @@ function buildExcel(){
   // Sheet4: 狀態對照
   const ws4 = XLSX.utils.aoa_to_sheet([
     ['狀態代碼','說明'],
-    [0,'未完成'],[1,'已繳數據'],[2,'已繳資料'],[3,'待確認'],[4,'異常'],[5,'已配合（公告）'],
+    ['未完成','尚未完成'],['已完成','手動標記完成'],['逾期未完成','過截止日自動標示'],
+    ['無學員','不計入完成率'],['已配合','公告事項已配合'],['待確認','已收到待確認'],['異常','資料異常'],
     ['',''],
     ['更新時間', new Date().toLocaleString('zh-TW')]
   ]);
-  ws4['!cols']=[{wch:10},{wch:20}];
+  ws4['!cols']=[{wch:14},{wch:20}];
   XLSX.utils.book_append_sheet(wb, ws4, 'README');
+
+  // Sheet5: 系統設定（帳密與Token）
+  const deptCreds = G.cfg.deptCreds || {};
+  const cfgRows = [
+    ['設定項目','值','說明'],
+    ['admin_user', G.cfg.adminUser||'admin', '管理員帳號'],
+    ['admin_pass', G.cfg.adminPass||'', '管理員密碼'],
+    ['github_token', G.cfg.token||'', 'GitHub Token'],
+    ['github_user', G.cfg.user||'', 'GitHub 帳號'],
+    ['github_repo', G.cfg.repo||'', 'GitHub Repo'],
+    ['github_path', G.cfg.path||'tracking_data.xlsx', 'Excel 路徑'],
+    ['','',''],
+    ['職類帳號設定','',''],
+    ['職類名稱','帳號','密碼'],
+    ...G.depts.map(d=>{
+      const cred=deptCreds[d]||{user:'',pass:''};
+      return [d, cred.user||'', cred.pass||''];
+    })
+  ];
+  const ws5 = XLSX.utils.aoa_to_sheet(cfgRows);
+  ws5['!cols']=[{wch:20},{wch:30},{wch:20}];
+  XLSX.utils.book_append_sheet(wb, ws5, '系統設定');
 
   return XLSX.write(wb, {type:'base64', bookType:'xlsx'});
 }
@@ -1406,6 +1462,34 @@ function parseExcel(b64){
       depts:     String(r[9]||'').split('、').filter(Boolean),
       note:      String(r[10]||''),
     }));
+  }
+
+  // 讀系統設定（帳密與Token）
+  if(wb.SheetNames.includes('系統設定')){
+    const ws = wb.Sheets['系統設定'];
+    const rows = XLSX.utils.sheet_to_json(ws, {header:1});
+    const cfgMap={};
+    for(const row of rows){
+      if(row[0]&&row[1]!==undefined) cfgMap[String(row[0])]=String(row[1]||'');
+    }
+    if(cfgMap['admin_user']) G.cfg.adminUser=cfgMap['admin_user'];
+    if(cfgMap['admin_pass']) G.cfg.adminPass=cfgMap['admin_pass'];
+    if(cfgMap['github_token']) G.cfg.token=cfgMap['github_token'];
+    if(cfgMap['github_user']) G.cfg.user=cfgMap['github_user'];
+    if(cfgMap['github_repo']) G.cfg.repo=cfgMap['github_repo'];
+    if(cfgMap['github_path']) G.cfg.path=cfgMap['github_path'];
+    // 讀職類帳密
+    const deptCreds={};
+    let inDeptSection=false;
+    for(const row of rows){
+      if(String(row[0]||'')==='職類名稱'){ inDeptSection=true; continue; }
+      if(inDeptSection && row[0] && String(row[0]).trim()){
+        deptCreds[String(row[0])]={user:String(row[1]||''),pass:String(row[2]||'')};
+      }
+    }
+    G.cfg.deptCreds=deptCreds;
+    // save to localStorage too
+    saveCfg();
   }
 
   // 讀追蹤矩陣（狀態）
