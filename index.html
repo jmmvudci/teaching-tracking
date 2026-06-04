@@ -1138,29 +1138,17 @@ function openPicker(e,itemId,dept,trackMode,isNotice,periodIdx=0){
   }
   document.getElementById('spOpts').innerHTML=html;
   const sp=document.getElementById('spBox');
-  // 先放到畫面外渲染以取得真實高度
-  sp.style.top='-9999px'; sp.style.left='-9999px';
-  sp.style.display='block'; sp.style.visibility='hidden';
+  sp.style.display='block';
   document.getElementById('spOv').style.display='block';
-
-  // 用 setTimeout 確保 DOM 已渲染
-  setTimeout(()=>{
-    const r=e.currentTarget.getBoundingClientRect();
-    const spH=sp.offsetHeight;
-    const spW=sp.offsetWidth||210;
-    const vw=window.innerWidth;
-    const vh=window.innerHeight;
-    // 垂直：優先往下，不夠就往上
-    let top;
-    if(r.bottom+spH+8<=vh) top=r.bottom+window.scrollY+4;
-    else if(r.top-spH-4>=0) top=r.top+window.scrollY-spH-4;
-    else top=window.scrollY+vh-spH-8; // 貼底
-    // 水平：不超出右邊
-    let left=Math.max(4, Math.min(r.left, vw-spW-8));
-    sp.style.top=top+'px';
-    sp.style.left=left+'px';
-    sp.style.visibility='visible';
-  }, 0);
+  const r=e.currentTarget.getBoundingClientRect();
+  const vw=window.innerWidth; const vh=window.innerHeight;
+  const spW=220; const spH=sp.offsetHeight||200;
+  const top=r.bottom+spH+8<=vh
+    ? r.bottom+window.scrollY+4
+    : r.top+window.scrollY-spH-4;
+  sp.style.top=Math.max(window.scrollY+4,top)+'px';
+  sp.style.left=Math.max(4,Math.min(r.left,vw-spW-8))+'px';
+  sp.style.visibility='visible';
 }
 function closePicker(){ document.getElementById('spBox').style.display='none'; document.getElementById('spOv').style.display='none'; _pc=null; }
 function setStatus(s){
