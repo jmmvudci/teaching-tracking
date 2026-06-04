@@ -114,6 +114,7 @@ select{background:#fff;border:1px solid #e2e8f0;color:#2d3748;padding:6px 10px;b
 .spill{display:inline-flex;align-items:center;justify-content:center;padding:3px 8px;border-radius:99px;font-size:11px;font-weight:500;min-width:62px;transition:filter .15s;white-space:nowrap;}
 .s0{background:#f7fafc;color:#718096;border:1px solid #e2e8f0;}
 .sna{background:#f7fafc;color:#a0aec0;border:1px solid #e2e8f0;font-style:italic;}
+.sreject{background:#fff5f5;color:#c53030;border:1px solid #fed7d7;font-weight:600;}
 .s1{background:#ebf8ff;color:#2b6cb0;border:1px solid #bee3f8;}
 .s2{background:#f0fff4;color:#276749;border:1px solid #9ae6b4;}
 .s3{background:#fffff0;color:#975a16;border:1px solid #faf089;}
@@ -373,6 +374,8 @@ select{background:#fff;border:1px solid #e2e8f0;color:#2d3748;padding:6px 10px;b
       <div style="display:flex;align-items:center;gap:12px;"><span class="spill s0">未完成</span><span style="color:var(--text2);font-size:13px">尚未完成</span></div>
       <div style="display:flex;align-items:center;gap:12px;"><span class="spill s2">已完成</span><span style="color:var(--text2);font-size:13px">模式一：手動標記完成</span></div>
       <div style="display:flex;align-items:center;gap:12px;"><span class="spill s2">6/15 完成</span><span style="color:var(--text2);font-size:13px">模式二：填入完成日期</span></div>
+      <div style="display:flex;align-items:center;gap:12px;"><span class="spill sna">無學員</span><span style="color:var(--text2);font-size:13px">模式二：不計入完成率</span></div>
+      <div style="display:flex;align-items:center;gap:12px;"><span class="spill sreject">未符合</span><span style="color:var(--text2);font-size:13px">模式二：管理員審核退回，不算完成</span></div>
       <div style="display:flex;align-items:center;gap:12px;"><span class="spill s4">逾期未完成</span><span style="color:var(--text2);font-size:13px">過截止日自動標示</span></div>
       <div style="display:flex;align-items:center;gap:12px;"><span class="spill s3">待確認</span><span style="color:var(--text2);font-size:13px">已收到，待確認</span></div>
       <div style="display:flex;align-items:center;gap:12px;"><span class="spill s5">已配合</span><span style="color:var(--text2);font-size:13px">公告事項已配合完成</span></div>
@@ -526,6 +529,7 @@ function sLabel(s){
   if(s==='done') return '已完成';
   if(s==='overdue') return '逾期未完成';
   if(s==='na') return '無學員';
+  if(s==='reject') return '未符合';
   if(s===5) return '已配合';
   if(s===3) return '待確認';
   if(s===4) return '異常';
@@ -538,6 +542,7 @@ function sLabel(s){
 function sClass(s){
   if(s===0) return 's0';
   if(s==='na') return 'sna';
+  if(s==='reject') return 'sreject';
   if(s==='done'||(typeof s==='string'&&s.match(/^\d{4}-\d{2}-\d{2}$/))) return 's2';
   if(s==='overdue'||s===4) return 's4';
   if(s===5) return 's5';
@@ -1123,7 +1128,8 @@ function openPicker(e,itemId,dept,trackMode,isNotice,periodIdx=0){
   } else if(trackMode==='date'){
     html=`
       <div class="sp-item" onclick="setStatus(0)"><span class="spill s0">未完成</span></div>
-      <div class="sp-item" onclick="setStatus('na')"><span class="spill s3" style="background:#f7fafc;color:#a0aec0;border-color:#e2e8f0;">無學員</span></div>
+      <div class="sp-item" onclick="setStatus('na')"><span class="spill sna">無學員</span></div>
+      <div class="sp-item" onclick="setStatus('reject')"><span class="spill sreject">未符合</span></div>
       <div style="padding:8px 10px;border-top:1px solid #f0f4f8;">
         <div style="font-size:11px;color:#4a5568;margin-bottom:5px;">填入完成日期</div>
         <div style="display:flex;gap:6px;align-items:center;">
@@ -1143,7 +1149,7 @@ function openPicker(e,itemId,dept,trackMode,isNotice,periodIdx=0){
   const r=e.currentTarget.getBoundingClientRect();
   const spW=220;
   // 用 fixed 定位，座標直接用 viewport 座標（不加 scrollY）
-  const estimatedH=trackMode==='date'?140:90;
+  const estimatedH=trackMode==='date'?185:90;
   const useTop=r.bottom+estimatedH+8<=window.innerHeight;
   sp.style.top=(useTop ? r.bottom+4 : r.top-estimatedH-4)+'px';
   sp.style.left=Math.max(4,Math.min(r.left,window.innerWidth-spW-8))+'px';
@@ -1158,7 +1164,7 @@ function setStatus(s){
   }
   G.statusMap[sk(_pc.itemId,_pc.dept,_pc.periodIdx)]=val;
   markDirty(); closePicker(); renderMatrix(); renderOverview();
-  const lbl=val===0?'未完成':val==='done'?'已完成':val===5?'已配合':val===3?'待確認':val===4?'異常':`${val} 完成`;
+  const lbl=val===0?'未完成':val==='done'?'已完成':val==='na'?'無學員':val==='reject'?'未符合':val===5?'已配合':val===3?'待確認':val===4?'異常':`${val} 完成`;
   toast(`已更新為「${lbl}」`);
 }
 
