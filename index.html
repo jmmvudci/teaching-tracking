@@ -620,9 +620,9 @@ function isLoggedIn(){ return isAdmin()||isManager()||currentDept()!==null; }
 function openLoginModal(mode='admin', pendingTab=null){
   window._loginMode=mode; window._pendingTab=pendingTab;
   const isAdm=mode==='admin';
-  document.getElementById('loginIcon').textContent=isAdm?'🔐':'🏥';
-  document.getElementById('loginTitle').textContent=isAdm?'登入':'職類登入';
-  document.getElementById('loginSub').textContent=isAdm?'請輸入帳號與密碼':'請輸入您的職類帳號與密碼';
+  document.getElementById('loginIcon').textContent=isAdm?'🔐':'🔑';
+  document.getElementById('loginTitle').textContent='登入';
+  document.getElementById('loginSub').textContent=isAdm?'請輸入帳號與密碼':'請輸入帳號與密碼';
   document.getElementById('loginUser').value='';
   document.getElementById('loginPwd').value='';
   document.getElementById('loginErr').textContent='';
@@ -1181,12 +1181,14 @@ function openPickerAt(e, tdEl, itemId, dept, trackMode, isNotice, periodIdx=0){
   const sp=document.getElementById('spBox');
   sp.style.display='block';
   document.getElementById('spOv').style.display='block';
-  // 用 td 元素的位置計算，不用 e.currentTarget
-  const r=(tdEl||e.currentTarget).getBoundingClientRect();
-  const estimatedH=trackMode==='date'?185:90;
-  const useTop=r.bottom+estimatedH+8<=window.innerHeight;
-  sp.style.top=(useTop ? r.bottom+4 : r.top-estimatedH-4)+'px';
-  sp.style.left=Math.max(4,Math.min(r.left,window.innerWidth-224))+'px';
+  // 用滑鼠座標定位，不受事件委派影響
+  const mx=e.clientX, my=e.clientY;
+  const estimatedH=trackMode==='date'?190:100;
+  const spW=230;
+  const top=my+estimatedH+8<=window.innerHeight ? my+4 : my-estimatedH-4;
+  const left=Math.max(4, Math.min(mx-20, window.innerWidth-spW-8));
+  sp.style.top=Math.max(4,top)+'px';
+  sp.style.left=left+'px';
 }
 // legacy wrapper
 function openPicker(e,itemId,dept,trackMode,isNotice,periodIdx=0){
