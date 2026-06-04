@@ -1109,7 +1109,11 @@ function renderMatrix(){
             if(!matched){r+=`<td class="nacell">—</td>`;continue;}
           }
           const canEdit=canEditDept(dp);
-          r+=`<td class="${canEdit?'scell':'scell-ro'}" ${canEdit?`onclick="openPicker(event,'${item.id}','${dp}','${item.trackMode||'simple'}',${item.type==='notice'},${p.periodIdx})"`:''}>
+          r+=`<td class="${canEdit?'scell':'scell-ro'}"
+            data-iid="${item.id}" data-dept="${dp}"
+            data-mode="${item.trackMode||'simple'}"
+            data-notice="${item.type==='notice'}"
+            data-period="${p.periodIdx}">
             <span class="spill ${sCls}">${sLbl}</span></td>`;
         }
         r+=`</tr>`;
@@ -1121,6 +1125,15 @@ function renderMatrix(){
   html+=renderRows(notice, notice.length&&submit.length?'📢 公告配合項目':'');
   html+=`</tbody>`;
   mwrap.innerHTML=`<table class="mtable" id="mTable">${html}</table>`;
+  // 用事件委派處理格子點擊，避免 inline onclick 字串跳脫問題
+  mwrap.onclick=function(e){
+    const td=e.target.closest('td.scell');
+    if(!td) return;
+    const iid=td.dataset.iid, dept=td.dataset.dept;
+    const mode=td.dataset.mode, isNotice=td.dataset.notice==='true';
+    const period=parseInt(td.dataset.period||'0');
+    openPicker(e, iid, dept, mode, isNotice, period);
+  };
 }
 
 // ══════════════════════════════════════════
