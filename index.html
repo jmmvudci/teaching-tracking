@@ -1131,12 +1131,12 @@ function openPicker(e,itemId,dept,trackMode,isNotice,periodIdx=0){
   e.stopPropagation();
   // if logged in as dept and not own dept, block
   const cd=currentDept();
-  if(cd!==null && !isAdmin() && cd!==dept){
+  if(cd!==null && !isAdmin() && !isManager() && cd!==dept){
     toast(`您登入的是「${cd}」，無法修改其他職類`);
     return;
   }
-  // if not logged in, prompt login then return
-  if(!isAdmin() && cd===null){
+  // if not logged in at all, prompt login
+  if(!isAdmin() && !isManager() && cd===null){
     window._afterLogin={itemId,dept,trackMode,isNotice,periodIdx};
     openLoginModal('dept');
     return;
