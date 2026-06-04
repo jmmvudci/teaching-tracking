@@ -227,7 +227,7 @@ select{background:#fff;border:1px solid #e2e8f0;color:#2d3748;padding:6px 10px;b
   <button class="tab active" id="tab-overview" onclick="switchTab('overview',this)">📊 總覽</button>
   <button class="tab" id="tab-deptprogress" onclick="switchTab('deptprogress',this)">📈 職類進度</button>
   <button class="tab" id="tab-matrix" onclick="switchTab('matrix',this)">🗂 追蹤矩陣</button>
-  <button class="tab" id="tab-items" onclick="requireAdmin('items',this)">📝 項目管理 🔒</button>
+  <button class="tab" id="tab-items" onclick="requireManager('items',this)">📝 項目管理 🔒</button>
   <button class="tab" id="tab-settings" onclick="requireAdmin('settings',this)">⚙️ 設定 🔒</button>
 </div>
 
@@ -317,6 +317,27 @@ select{background:#fff;border:1px solid #e2e8f0;color:#2d3748;padding:6px 10px;b
       <div class="fg">
         <label class="flabel">確認新密碼</label>
         <input class="fi" id="cfgAdminPass2" type="password" placeholder="再次輸入">
+      </div>
+    </div>
+    <div class="hint" style="margin-bottom:8px;">留空表示不修改密碼</div>
+  </div>
+
+  <!-- 副管理員帳密 -->
+  <div class="ssec">
+    <h4>👔 副管理員帳密設定</h4>
+    <div style="font-size:12px;color:#718096;margin-bottom:12px;">可進入項目管理（新增/刪除），可修改所有職類追蹤狀態，但無法進入設定頁。</div>
+    <div class="fg">
+      <label class="flabel">副管理員帳號</label>
+      <input class="fi" id="cfgMgrUser" style="max-width:200px;" placeholder="例：manager">
+    </div>
+    <div class="frow" style="max-width:420px;">
+      <div class="fg">
+        <label class="flabel">新密碼</label>
+        <input class="fi" id="cfgMgrPass" type="password" placeholder="設定新密碼">
+      </div>
+      <div class="fg">
+        <label class="flabel">確認新密碼</label>
+        <input class="fi" id="cfgMgrPass2" type="password" placeholder="再次輸入">
       </div>
     </div>
     <div class="hint" style="margin-bottom:8px;">留空表示不修改密碼</div>
@@ -569,7 +590,8 @@ let G = {
   editId: null,
   // GitHub config (stored separately in localStorage, never in Excel)
   cfg: { user:'', repo:'', path:'tracking_data.xlsx', token:'',
-         adminUser:'admin', adminPass:'5678' },  // 預設帳密，請在設定頁修改
+         adminUser:'admin', adminPass:'5678',
+         managerCreds:{user:'',pass:''} },  // 預設帳密，請在設定頁修改
   // runtime
   fileSha: '',
   dirty: false,
@@ -578,123 +600,119 @@ let G = {
 // ══════════════════════════════════════════
 //  AUTH (Admin + Dept)
 // ══════════════════════════════════════════
-const ADMIN_SESSION_KEY = 'ats_admin_session';
-const DEPT_SESSION_KEY  = 'ats_dept_session';  // stores dept name
+const ADMIN_SESSION_KEY   = 'ats_admin_session';
+const MANAGER_SESSION_KEY = 'ats_manager_session'; // 副管理員
+const DEPT_SESSION_KEY    = 'ats_dept_session';     // 職類
 
-function isAdmin(){ return sessionStorage.getItem(ADMIN_SESSION_KEY) === 'true'; }
+function isAdmin(){   return sessionStorage.getItem(ADMIN_SESSION_KEY)   === 'true'; }
+function isManager(){ return sessionStorage.getItem(MANAGER_SESSION_KEY) === 'true'; }
 function currentDept(){ return sessionStorage.getItem(DEPT_SESSION_KEY) || null; }
-// canEditDept: if not logged in, allow click (will prompt login); if logged in as dept, restrict to own dept; admin can edit all
+function canManage(){ return isAdmin() || isManager(); }  // 可進入項目管理
 function canEditDept(dept){
-  if(isAdmin()) return true;
-  const cd = currentDept();
-  if(cd === null) return true; // not logged in - allow click, openPicker will check
-  return cd === dept;
+  if(isAdmin()||isManager()) return true;
+  const cd=currentDept();
+  if(cd===null) return true; // 未登入允許點擊，openPicker 會再確認
+  return cd===dept;
 }
-function isLoggedIn(){ return isAdmin() || currentDept() !== null; }
+function isLoggedIn(){ return isAdmin()||isManager()||currentDept()!==null; }
 
-// open login modal - mode: 'admin' or 'dept'
+// open login modal
 function openLoginModal(mode='admin', pendingTab=null){
-  window._loginMode = mode;
-  window._pendingTab = pendingTab;
-  const isAdm = mode==='admin';
-  document.getElementById('loginIcon').textContent = isAdm ? '🔐' : '🏥';
-  document.getElementById('loginTitle').textContent = isAdm ? '管理員登入' : '職類登入';
-  document.getElementById('loginSub').textContent = isAdm ? '項目管理與設定功能僅限管理員使用' : '請輸入您的職類帳號與密碼';
-  document.getElementById('loginUser').value = '';
-  document.getElementById('loginPwd').value = '';
-  document.getElementById('loginErr').textContent = '';
+  window._loginMode=mode; window._pendingTab=pendingTab;
+  const isAdm=mode==='admin';
+  document.getElementById('loginIcon').textContent=isAdm?'🔐':'🏥';
+  document.getElementById('loginTitle').textContent=isAdm?'登入':'職類登入';
+  document.getElementById('loginSub').textContent=isAdm?'請輸入帳號與密碼':'請輸入您的職類帳號與密碼';
+  document.getElementById('loginUser').value='';
+  document.getElementById('loginPwd').value='';
+  document.getElementById('loginErr').textContent='';
   document.getElementById('loginOverlay').classList.remove('h');
-  setTimeout(()=>document.getElementById('loginUser').focus(), 100);
+  setTimeout(()=>document.getElementById('loginUser').focus(),100);
 }
 
 function requireAdmin(tabName, btn){
-  if(isAdmin()){ switchTab(tabName, btn); }
-  else { openLoginModal('admin', {name:tabName, btn}); }
+  if(isAdmin()){ switchTab(tabName,btn); }
+  else { openLoginModal('admin',{name:tabName,btn}); }
+}
+function requireManager(tabName, btn){
+  if(canManage()){ switchTab(tabName,btn); }
+  else { openLoginModal('admin',{name:tabName,btn}); }
 }
 
 function doLogin(){
-  const u = document.getElementById('loginUser').value.trim();
-  const p = document.getElementById('loginPwd').value;
-  const mode = window._loginMode || 'admin';
-
-  if(mode==='admin'){
-    if(u === G.cfg.adminUser && p === G.cfg.adminPass){
-      sessionStorage.setItem(ADMIN_SESSION_KEY, 'true');
-      sessionStorage.removeItem(DEPT_SESSION_KEY);
-      document.getElementById('loginOverlay').classList.add('h');
-      updateAuthBadge(); toast('已登入管理員模式');
-      if(window._pendingTab){ switchTab(window._pendingTab.name, window._pendingTab.btn); window._pendingTab=null; }
-    } else {
-      // try dept login too
-      const deptCreds = G.cfg.deptCreds || {};
-      const matched = Object.entries(deptCreds).find(([dept,cred])=>cred&&cred.user===u&&cred.pass===p);
-      if(matched){
-        loginAsDept(matched[0]);
-      } else {
-        document.getElementById('loginErr').textContent = '帳號或密碼錯誤，請重試';
-        document.getElementById('loginPwd').value = ''; document.getElementById('loginPwd').focus();
-      }
-    }
-  } else {
-    // dept mode
-    const deptCreds = G.cfg.deptCreds || {};
-    const matched = Object.entries(deptCreds).find(([dept,cred])=>cred&&cred.user===u&&cred.pass===p);
-    if(matched){
-      loginAsDept(matched[0]);
-    } else {
-      document.getElementById('loginErr').textContent = '帳號或密碼錯誤，請重試';
-      document.getElementById('loginPwd').value = ''; document.getElementById('loginPwd').focus();
-    }
+  const u=document.getElementById('loginUser').value.trim();
+  const p=document.getElementById('loginPwd').value;
+  // 1. admin
+  if(u===G.cfg.adminUser && p===G.cfg.adminPass){
+    sessionStorage.setItem(ADMIN_SESSION_KEY,'true');
+    sessionStorage.removeItem(MANAGER_SESSION_KEY);
+    sessionStorage.removeItem(DEPT_SESSION_KEY);
+    document.getElementById('loginOverlay').classList.add('h');
+    updateAuthBadge(); toast('已登入管理員模式');
+    if(window._pendingTab){ switchTab(window._pendingTab.name,window._pendingTab.btn); window._pendingTab=null; }
+    return;
   }
+  // 2. 副管理員
+  const mgr=G.cfg.managerCreds||{};
+  if(mgr.user && u===mgr.user && p===mgr.pass){
+    sessionStorage.setItem(MANAGER_SESSION_KEY,'true');
+    sessionStorage.removeItem(ADMIN_SESSION_KEY);
+    sessionStorage.removeItem(DEPT_SESSION_KEY);
+    document.getElementById('loginOverlay').classList.add('h');
+    updateAuthBadge(); toast('已登入副管理員模式');
+    if(window._pendingTab){ switchTab(window._pendingTab.name,window._pendingTab.btn); window._pendingTab=null; }
+    return;
+  }
+  // 3. 職類
+  const deptCreds=G.cfg.deptCreds||{};
+  const matched=Object.entries(deptCreds).find(([dept,cred])=>cred&&cred.user===u&&cred.pass===p);
+  if(matched){ loginAsDept(matched[0]); return; }
+  document.getElementById('loginErr').textContent='帳號或密碼錯誤，請重試';
+  document.getElementById('loginPwd').value=''; document.getElementById('loginPwd').focus();
 }
 
 function loginAsDept(dept){
-  sessionStorage.setItem(DEPT_SESSION_KEY, dept);
+  sessionStorage.setItem(DEPT_SESSION_KEY,dept);
   sessionStorage.removeItem(ADMIN_SESSION_KEY);
+  sessionStorage.removeItem(MANAGER_SESSION_KEY);
   document.getElementById('loginOverlay').classList.add('h');
-  updateAuthBadge();
-  toast(`已登入：${dept}`);
-  renderMatrix();
-  // resume pending picker action if any
+  updateAuthBadge(); toast(`已登入：${dept}`); renderMatrix();
   if(window._afterLogin){
     const a=window._afterLogin; window._afterLogin=null;
-    if(a.dept===dept || isAdmin()){
-      setTimeout(()=>{
-        const cells=document.querySelectorAll('.scell');
-        // re-trigger via simulated context - just re-render and let user click again
-        toast(`已登入「${dept}」，請再點一次格子`);
-      },300);
-    } else {
-      toast(`您登入的是「${dept}」，無法修改「${a.dept}」的格子`);
-    }
-    window._afterLogin=null;
+    if(a.dept===dept){ setTimeout(()=>toast(`已登入「${dept}」，請再點一次格子`),300); }
+    else { toast(`您登入的是「${dept}」，無法修改「${a.dept}」的格子`); }
   }
 }
 
 function closeLogin(){
   document.getElementById('loginOverlay').classList.add('h');
-  window._pendingTab = null;
+  window._pendingTab=null;
 }
 
 function doLogout(){
   sessionStorage.removeItem(ADMIN_SESSION_KEY);
+  sessionStorage.removeItem(MANAGER_SESSION_KEY);
   sessionStorage.removeItem(DEPT_SESSION_KEY);
   updateAuthBadge();
-  const active = document.querySelector('.panel.active');
-  if(active && (active.id==='panel-items'||active.id==='panel-settings')){
-    switchTab('overview', document.getElementById('tab-overview'));
+  const active=document.querySelector('.panel.active');
+  if(active&&(active.id==='panel-items'||active.id==='panel-settings')){
+    switchTab('overview',document.getElementById('tab-overview'));
   }
-  renderMatrix();
-  toast('已登出');
+  renderMatrix(); toast('已登出');
 }
 
 function updateAuthBadge(){
-  const badge = document.getElementById('adminBadge');
+  const badge=document.getElementById('adminBadge');
   if(isAdmin()){
     badge.style.display='flex';
     badge.innerHTML=`<span class="admin-badge" onclick="doLogout()" title="點擊登出">🛡 管理員 ✕</span>`;
     document.getElementById('tab-items').textContent='📝 項目管理';
     document.getElementById('tab-settings').textContent='⚙️ 設定';
+  } else if(isManager()){
+    badge.style.display='flex';
+    badge.innerHTML=`<span class="admin-badge" style="background:rgba(49,130,206,.15);border-color:rgba(49,130,206,.5);" onclick="doLogout()" title="點擊登出">👔 副管理員 ✕</span>`;
+    document.getElementById('tab-items').textContent='📝 項目管理';
+    document.getElementById('tab-settings').textContent='⚙️ 設定 🔒';
   } else if(currentDept()){
     badge.style.display='flex';
     badge.innerHTML=`<span class="admin-badge" style="background:rgba(56,161,105,.2);border-color:rgba(56,161,105,.6);" onclick="doLogout()" title="點擊登出">🏥 ${currentDept()} ✕</span>`;
@@ -1262,6 +1280,10 @@ function renderSettings(){
   document.getElementById('cfgAdminUser').value = G.cfg.adminUser || 'admin';
   document.getElementById('cfgAdminPass').value = '';
   document.getElementById('cfgAdminPass2').value = '';
+  // manager fields
+  document.getElementById('cfgMgrUser').value = G.cfg.managerCreds?.user || '';
+  document.getElementById('cfgMgrPass').value = '';
+  document.getElementById('cfgMgrPass2').value = '';
   // fill cfg fields
   document.getElementById('cfgUser').value  = G.cfg.user  || '';
   document.getElementById('cfgRepo').value  = G.cfg.repo  || '';
@@ -1307,6 +1329,17 @@ function saveConfig(){
     if(newPass !== newPass2){ toast('兩次密碼輸入不一致，請重新確認'); return; }
     if(newPass.length < 4){ toast('密碼至少需要 4 個字元'); return; }
     G.cfg.adminPass = newPass;
+  }
+  // manager credentials
+  const mgrUser = document.getElementById('cfgMgrUser').value.trim();
+  const mgrPass = document.getElementById('cfgMgrPass').value;
+  const mgrPass2 = document.getElementById('cfgMgrPass2').value;
+  if(!G.cfg.managerCreds) G.cfg.managerCreds={user:'',pass:''};
+  if(mgrUser) G.cfg.managerCreds.user = mgrUser;
+  if(mgrPass || mgrPass2){
+    if(mgrPass !== mgrPass2){ toast('副管理員兩次密碼不一致'); return; }
+    if(mgrPass.length < 4){ toast('密碼至少需要 4 個字元'); return; }
+    G.cfg.managerCreds.pass = mgrPass;
   }
   G.cfg.user=document.getElementById('cfgUser').value.trim();
   G.cfg.repo=document.getElementById('cfgRepo').value.trim();
@@ -1414,6 +1447,8 @@ function buildExcel(){
     ['設定項目','值','說明'],
     ['admin_user', G.cfg.adminUser||'admin', '管理員帳號'],
     ['admin_pass', G.cfg.adminPass||'', '管理員密碼'],
+    ['manager_user', G.cfg.managerCreds?.user||'', '副管理員帳號'],
+    ['manager_pass', G.cfg.managerCreds?.pass||'', '副管理員密碼'],
     ['github_token', G.cfg.token||'', 'GitHub Token'],
     ['github_user', G.cfg.user||'', 'GitHub 帳號'],
     ['github_repo', G.cfg.repo||'', 'GitHub Repo'],
@@ -1477,6 +1512,11 @@ function parseExcel(b64){
     }
     if(cfgMap['admin_user']) G.cfg.adminUser=cfgMap['admin_user'];
     if(cfgMap['admin_pass']) G.cfg.adminPass=cfgMap['admin_pass'];
+    if(cfgMap['manager_user']||cfgMap['manager_pass']){
+      if(!G.cfg.managerCreds) G.cfg.managerCreds={user:'',pass:''};
+      if(cfgMap['manager_user']) G.cfg.managerCreds.user=cfgMap['manager_user'];
+      if(cfgMap['manager_pass']) G.cfg.managerCreds.pass=cfgMap['manager_pass'];
+    }
     if(cfgMap['github_token']) G.cfg.token=cfgMap['github_token'];
     if(cfgMap['github_user']) G.cfg.user=cfgMap['github_user'];
     if(cfgMap['github_repo']) G.cfg.repo=cfgMap['github_repo'];
