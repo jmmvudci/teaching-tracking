@@ -1132,7 +1132,7 @@ function renderMatrix(){
     const iid=td.dataset.iid, dept=td.dataset.dept;
     const mode=td.dataset.mode, isNotice=td.dataset.notice==='true';
     const period=parseInt(td.dataset.period||'0');
-    openPicker(e, iid, dept, mode, isNotice, period);
+    openPickerAt(e, td, iid, dept, mode, isNotice, period);
   };
 }
 
@@ -1140,15 +1140,14 @@ function renderMatrix(){
 //  STATUS PICKER
 // ══════════════════════════════════════════
 let _pc=null;
-function openPicker(e,itemId,dept,trackMode,isNotice,periodIdx=0){
+function openPickerAt(e, tdEl, itemId, dept, trackMode, isNotice, periodIdx=0){
   e.stopPropagation();
-  // if logged in as dept and not own dept, block
+  // permission checks
   const cd=currentDept();
   if(cd!==null && !isAdmin() && !isManager() && cd!==dept){
     toast(`您登入的是「${cd}」，無法修改其他職類`);
     return;
   }
-  // if not logged in at all, prompt login
   if(!isAdmin() && !isManager() && cd===null){
     window._afterLogin={itemId,dept,trackMode,isNotice,periodIdx};
     openLoginModal('dept');
@@ -1182,13 +1181,16 @@ function openPicker(e,itemId,dept,trackMode,isNotice,periodIdx=0){
   const sp=document.getElementById('spBox');
   sp.style.display='block';
   document.getElementById('spOv').style.display='block';
-  const r=e.currentTarget.getBoundingClientRect();
-  const spW=220;
-  // 用 fixed 定位，座標直接用 viewport 座標（不加 scrollY）
+  // 用 td 元素的位置計算，不用 e.currentTarget
+  const r=(tdEl||e.currentTarget).getBoundingClientRect();
   const estimatedH=trackMode==='date'?185:90;
   const useTop=r.bottom+estimatedH+8<=window.innerHeight;
   sp.style.top=(useTop ? r.bottom+4 : r.top-estimatedH-4)+'px';
-  sp.style.left=Math.max(4,Math.min(r.left,window.innerWidth-spW-8))+'px';
+  sp.style.left=Math.max(4,Math.min(r.left,window.innerWidth-224))+'px';
+}
+// legacy wrapper
+function openPicker(e,itemId,dept,trackMode,isNotice,periodIdx=0){
+  openPickerAt(e, e.currentTarget, itemId, dept, trackMode, isNotice, periodIdx);
 }
 function closePicker(){ document.getElementById('spBox').style.display='none'; document.getElementById('spOv').style.display='none'; _pc=null; }
 function setStatus(s){
