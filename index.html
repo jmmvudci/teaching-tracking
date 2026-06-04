@@ -1545,6 +1545,16 @@ async function syncToGitHub(){
   const btn=document.getElementById('syncBtn');
   btn.className='sync-btn saving'; btn.textContent='☁ 上傳中...';
   try{
+    // 若沒有 sha，先取得最新的
+    if(!G.fileSha){
+      const check=await fetch(`https://api.github.com/repos/${user}/${repo}/contents/${path}`,
+        {headers:{Authorization:`token ${token}`,'Accept':'application/vnd.github.v3+json'}});
+      if(check.ok){
+        const checkData=await check.json();
+        G.fileSha=checkData.sha;
+      }
+      // 404 表示檔案不存在，第一次建立不需要 sha
+    }
     const content=buildExcel();
     const body={message:`update tracking data ${new Date().toLocaleString('zh-TW')}`,content,branch:'main'};
     if(G.fileSha) body.sha=G.fileSha;
