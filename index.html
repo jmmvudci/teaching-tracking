@@ -1141,14 +1141,12 @@ function openPicker(e,itemId,dept,trackMode,isNotice,periodIdx=0){
   sp.style.display='block';
   document.getElementById('spOv').style.display='block';
   const r=e.currentTarget.getBoundingClientRect();
-  const vw=window.innerWidth; const vh=window.innerHeight;
-  const spW=220; const spH=sp.offsetHeight||200;
-  const top=r.bottom+spH+8<=vh
-    ? r.bottom+window.scrollY+4
-    : r.top+window.scrollY-spH-4;
-  sp.style.top=Math.max(window.scrollY+4,top)+'px';
-  sp.style.left=Math.max(4,Math.min(r.left,vw-spW-8))+'px';
-  sp.style.visibility='visible';
+  const spW=220;
+  // 用 fixed 定位，座標直接用 viewport 座標（不加 scrollY）
+  const estimatedH=trackMode==='date'?140:90;
+  const useTop=r.bottom+estimatedH+8<=window.innerHeight;
+  sp.style.top=(useTop ? r.bottom+4 : r.top-estimatedH-4)+'px';
+  sp.style.left=Math.max(4,Math.min(r.left,window.innerWidth-spW-8))+'px';
 }
 function closePicker(){ document.getElementById('spBox').style.display='none'; document.getElementById('spOv').style.display='none'; _pc=null; }
 function setStatus(s){
