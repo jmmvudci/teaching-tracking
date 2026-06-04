@@ -737,10 +737,14 @@ function loadCfg(){
   try{
     const c = JSON.parse(localStorage.getItem('ats_cfg')||'{}');
     Object.assign(G.cfg, c);
+    // 若 managerCreds 是物件需要深層合併
+    if(c.managerCreds) G.cfg.managerCreds = Object.assign({user:'',pass:''}, c.managerCreds);
+    if(c.deptCreds) G.cfg.deptCreds = Object.assign({}, c.deptCreds);
   }catch(e){}
-  // 若 localStorage 無帳密，使用預設（首次使用）
+  // 若無帳密，使用預設
   if(!G.cfg.adminUser) G.cfg.adminUser='admin';
   if(!G.cfg.adminPass) G.cfg.adminPass='5678';
+  if(!G.cfg.managerCreds) G.cfg.managerCreds={user:'',pass:''};
 }
 function saveLocal(){
   // save non-config state locally as fallback
@@ -1447,7 +1451,7 @@ function buildExcel(){
     ['設定項目','值','說明'],
     ['admin_user', G.cfg.adminUser||'admin', '管理員帳號'],
     ['admin_pass', G.cfg.adminPass||'', '管理員密碼'],
-    ['manager_user', G.cfg.managerCreds?.user||'', '副管理員帳號'],
+    ['manager_user', G.cfg.managerCreds?.user||'', '副管理員帳號（留空表示停用）'],
     ['manager_pass', G.cfg.managerCreds?.pass||'', '副管理員密碼'],
     ['github_token', G.cfg.token||'', 'GitHub Token'],
     ['github_user', G.cfg.user||'', 'GitHub 帳號'],
@@ -1512,11 +1516,10 @@ function parseExcel(b64){
     }
     if(cfgMap['admin_user']) G.cfg.adminUser=cfgMap['admin_user'];
     if(cfgMap['admin_pass']) G.cfg.adminPass=cfgMap['admin_pass'];
-    if(cfgMap['manager_user']||cfgMap['manager_pass']){
-      if(!G.cfg.managerCreds) G.cfg.managerCreds={user:'',pass:''};
-      if(cfgMap['manager_user']) G.cfg.managerCreds.user=cfgMap['manager_user'];
-      if(cfgMap['manager_pass']) G.cfg.managerCreds.pass=cfgMap['manager_pass'];
-    }
+    // 副管理員：只要欄位存在就讀（允許空值覆蓋）
+    if(!G.cfg.managerCreds) G.cfg.managerCreds={user:'',pass:''};
+    if('manager_user' in cfgMap) G.cfg.managerCreds.user=cfgMap['manager_user']||'';
+    if('manager_pass' in cfgMap) G.cfg.managerCreds.pass=cfgMap['manager_pass']||'';
     if(cfgMap['github_token']) G.cfg.token=cfgMap['github_token'];
     if(cfgMap['github_user']) G.cfg.user=cfgMap['github_user'];
     if(cfgMap['github_repo']) G.cfg.repo=cfgMap['github_repo'];
