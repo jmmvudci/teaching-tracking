@@ -696,26 +696,31 @@ function doLogout(){
 
 function updateAuthBadge(){
   const badge=document.getElementById('adminBadge');
+  const syncBtn=document.getElementById('syncBtn');
   if(isAdmin()){
     badge.style.display='flex';
     badge.innerHTML=`<span class="admin-badge" onclick="doLogout()" title="點擊登出">🛡 管理員 ✕</span>`;
     document.getElementById('tab-items').textContent='📝 項目管理';
     document.getElementById('tab-settings').textContent='⚙️ 設定';
+    syncBtn.style.display='flex';
   } else if(isManager()){
     badge.style.display='flex';
     badge.innerHTML=`<span class="admin-badge" style="background:rgba(49,130,206,.15);border-color:rgba(49,130,206,.5);" onclick="doLogout()" title="點擊登出">👔 副管理員 ✕</span>`;
     document.getElementById('tab-items').textContent='📝 項目管理';
     document.getElementById('tab-settings').textContent='⚙️ 設定 🔒';
+    syncBtn.style.display='flex';
   } else if(currentDept()){
     badge.style.display='flex';
     badge.innerHTML=`<span class="admin-badge" style="background:rgba(56,161,105,.2);border-color:rgba(56,161,105,.6);" onclick="doLogout()" title="點擊登出">🏥 ${currentDept()} ✕</span>`;
     document.getElementById('tab-items').textContent='📝 項目管理 🔒';
     document.getElementById('tab-settings').textContent='⚙️ 設定 🔒';
+    syncBtn.style.display='none'; // 職類不需要全量儲存按鈕
   } else {
     badge.style.display='flex';
     badge.innerHTML=`<span class="admin-badge" style="background:rgba(160,174,192,.15);border-color:rgba(160,174,192,.4);cursor:pointer;" onclick="openLoginModal('dept')" title="點擊登入">🔓 登入編輯</span>`;
     document.getElementById('tab-items').textContent='📝 項目管理 🔒';
     document.getElementById('tab-settings').textContent='⚙️ 設定 🔒';
+    syncBtn.style.display='none'; // 未登入不顯示儲存按鈕
   }
 }
 
@@ -1469,13 +1474,28 @@ async function pushStatus(itemId, dept, periodIdx, value){
 // ── 儲存全部資料至 Apps Script ──
 async function syncToAPI(){
   if(!G.cfg.apiUrl){ toast('請先設定 API 網址'); return; }
+  // 只有管理員和副管理員可以全量儲存
+  if(!isAdmin() && !isManager()){ toast('僅管理員可執行全量儲存'); return; }
   const btn=document.getElementById('syncBtn');
   btn.className='sync-btn saving'; btn.textContent='☁ 儲存中...';
   try{
     const pass=G.cfg.adminPass;
     const dataStr=encodeURIComponent(JSON.stringify({depts:G.depts, items:G.items, statusMap:G.statusMap}));
-    const r=await apiGet({action:'write', pass, data:dataStr});
-    if(r.error) throw new Error(r.error);
+    if(dataStr.length > 7000){
+      // 分批：先存 depts 和 items，再存 statusMap
+      const r1=await apiGet({action:'write', pass, data:encodeURIComponent(JSON.stringify({depts:G.depts, items:G.items}))});
+      if(r1&&r1.error) throw new Error(r1.error);
+      // statusMap 分批存
+      const entries=Object.entries(G.statusMap);
+      const batchSize=50;
+      for(let i=0;i<entries.length;i+=batchSize){
+        const batch=Object.fromEntries(entries.slice(i,i+batchSize));
+        await apiGet({action:'write', pass, data:encodeURIComponent(JSON.stringify({statusMap:batch}))});
+      }
+    } else {
+      const r=await apiGet({action:'write', pass, data:dataStr});
+      if(r&&r.error) throw new Error(r.error);
+    }
     G.dirty=false;
     btn.className='sync-btn ok'; btn.textContent='✓ 已儲存';
     setTimeout(()=>{ btn.className='sync-btn'; btn.textContent='☁ 儲存'; },3000);
