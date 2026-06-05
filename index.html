@@ -354,6 +354,7 @@ select{background:#fff;border:1px solid #e2e8f0;color:#2d3748;padding:6px 10px;b
     <div style="display:flex;gap:8px;margin-top:8px;">
       <button class="btn pri" onclick="saveConfig()">儲存設定</button>
       <button class="btn" onclick="testAPIConnection()">🔌 測試連線</button>
+      <button class="btn" onclick="syncSettings()">☁ 同步帳密至 Google Sheet</button>
     </div>
     <div id="cfgStatus" style="margin-top:8px;font-size:12px;"></div>
   </div>
@@ -1348,9 +1349,7 @@ function saveConfig(){
   G.cfg.apiUrl=document.getElementById('cfgApiUrl').value.trim();
   saveCfg();
   toast('設定已儲存');
-  document.getElementById('cfgStatus').innerHTML='<span style="color:#276749">✓ 已儲存，請按測試連線確認</span>';
-  // 同步帳密到 Google Sheet
-  if(G.cfg.apiUrl) syncSettings();
+  document.getElementById('cfgStatus').innerHTML='<span style="color:#276749">✓ 已儲存</span>';
 }
 async function testAPIConnection(){
   if(!G.cfg.apiUrl){toast('請先填寫 API 網址');return;}
