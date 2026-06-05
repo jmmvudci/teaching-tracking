@@ -1387,9 +1387,10 @@ function removeDept(i){
 async function apiGet(params){
   if(!G.cfg.apiUrl) return null;
   const url=G.cfg.apiUrl+'?'+new URLSearchParams(params);
-  const r=await fetch(url);
-  if(!r.ok) throw new Error('HTTP '+r.status);
-  return r.json();
+  const r=await fetch(url, {redirect:'follow'});
+  const text=await r.text();
+  try{ return JSON.parse(text); }
+  catch(e){ console.error('API parse error:', text.slice(0,200)); throw new Error('API回傳非JSON'); }
 }
 
 // 所有寫入操作都用 GET + 編碼參數
@@ -1511,7 +1512,8 @@ async function init(){
 
   if(G.cfg.apiUrl){
     document.getElementById('overviewContent').innerHTML='<div class="loading"><div class="spinner"></div><div>從 Google Sheet 載入最新資料...</div></div>';
-    await fetchFromAPI();
+    const ok=await fetchFromAPI();
+    if(ok) saveLocal(); // 快取到 localStorage
   }
   renderOverview();
   updateTopStatus();
