@@ -581,7 +581,7 @@ let G = {
   statusMap: {},  // itemId-dept => 0-5
   editId: null,
   // GitHub config (stored separately in localStorage, never in Excel)
-  cfg: { apiUrl:'',          // Google Apps Script 部署網址
+  cfg: { apiUrl:'https://script.google.com/macros/s/AKfycbyPpe8p-SP9xiyme3SFH8Qc01Q8pkrvdKtQfOGyca31isPTFCKMnMFbry5Fk5NHvJfg/exec',
          adminUser:'admin', adminPass:'5678',
          managerCreds:{user:'',pass:''},
          deptCreds:{} },
@@ -730,6 +730,7 @@ function saveCfg(){
 function loadCfg(){
   try{
     const c = JSON.parse(localStorage.getItem('ats_cfg')||'{}');
+    // 若 localStorage 有 apiUrl 則覆蓋，否則保留程式碼預設值
     if(c.apiUrl) G.cfg.apiUrl = c.apiUrl;
   }catch(e){}
 }
