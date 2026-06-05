@@ -1476,28 +1476,15 @@ async function pushStatus(itemId, dept, periodIdx, value){
 // ── 儲存全部資料至 Apps Script ──
 async function syncToAPI(){
   if(!G.cfg.apiUrl){ toast('請先設定 API 網址'); return; }
-  // 只有管理員和副管理員可以全量儲存
-  if(!isAdmin() && !isManager()){ toast('僅管理員可執行全量儲存'); return; }
+  if(!isAdmin() && !isManager()){ toast('僅管理員可執行儲存'); return; }
   const btn=document.getElementById('syncBtn');
   btn.className='sync-btn saving'; btn.textContent='☁ 儲存中...';
   try{
     const pass=G.cfg.adminPass;
-    const dataStr=encodeURIComponent(JSON.stringify({depts:G.depts, items:G.items, statusMap:G.statusMap}));
-    if(dataStr.length > 7000){
-      // 分批：先存 depts 和 items，再存 statusMap
-      const r1=await apiGet({action:'write', pass, data:encodeURIComponent(JSON.stringify({depts:G.depts, items:G.items}))});
-      if(r1&&r1.error) throw new Error(r1.error);
-      // statusMap 分批存
-      const entries=Object.entries(G.statusMap);
-      const batchSize=50;
-      for(let i=0;i<entries.length;i+=batchSize){
-        const batch=Object.fromEntries(entries.slice(i,i+batchSize));
-        await apiGet({action:'write', pass, data:encodeURIComponent(JSON.stringify({statusMap:batch}))});
-      }
-    } else {
-      const r=await apiGet({action:'write', pass, data:dataStr});
-      if(r&&r.error) throw new Error(r.error);
-    }
+    // 只儲存 items 和 depts，statusMap 由 pushStatus 即時同步
+    const dataStr=encodeURIComponent(JSON.stringify({depts:G.depts, items:G.items}));
+    const r=await apiGet({action:'write', pass, data:dataStr});
+    if(r&&r.error) throw new Error(r.error);
     G.dirty=false;
     btn.className='sync-btn ok'; btn.textContent='✓ 已儲存';
     setTimeout(()=>{ btn.className='sync-btn'; btn.textContent='☁ 儲存'; },3000);
