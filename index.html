@@ -1345,12 +1345,12 @@ function saveConfig(){
     if(mgrPass.length < 4){ toast('密碼至少需要 4 個字元'); return; }
     G.cfg.managerCreds.pass = mgrPass;
   }
-  G.cfg.user=document.getElementById('cfgUser').value.trim();
-  G.cfg.repo=document.getElementById('cfgRepo').value.trim();
   G.cfg.apiUrl=document.getElementById('cfgApiUrl').value.trim();
   saveCfg();
-  toast('API 網址已儲存');
-  document.getElementById('cfgStatus').innerHTML='<span style="color:#276749">✓ 已儲存</span>';
+  toast('設定已儲存');
+  document.getElementById('cfgStatus').innerHTML='<span style="color:#276749">✓ 已儲存，請按測試連線確認</span>';
+  // 同步帳密到 Google Sheet
+  if(G.cfg.apiUrl) syncSettings();
 }
 async function testAPIConnection(){
   if(!G.cfg.apiUrl){toast('請先填寫 API 網址');return;}
