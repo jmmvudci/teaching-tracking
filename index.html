@@ -1436,11 +1436,11 @@ async function fetchFromAPI(){
 // ── 更新單一狀態格（即時同步） ──
 async function pushStatus(itemId, dept, periodIdx, value){
   const pass=getCurrentPass();
-  if(!pass){ toast('請先登入'); return; }
+  if(!pass){ toast('請先登入後再更新狀態'); return; }
   try{
-    const r=await apiGet({action:'updateStatus', pass, itemId, dept, periodIdx, value});
+    const r=await apiGet({action:'updateStatus', pass, itemId:String(itemId), dept, periodIdx:String(periodIdx||0), value:String(value)});
     if(r&&r.error) toast('同步失敗：'+r.error);
-  }catch(e){ toast('網路錯誤：'+e.message); }
+  }catch(e){ toast('同步失敗：'+e.message); }
 }
 
 // ── 儲存全部資料至 Apps Script ──
