@@ -1426,6 +1426,14 @@ async function fetchFromAPI(){
     if(data.depts && data.depts.length) G.depts = data.depts;
     if(data.items) G.items = data.items;
     if(data.statuses) G.statusMap = data.statuses;
+    // 資料載入完成，重新渲染所有頁面
+    updateAuthBadge();
+    updateTopStatus();
+    renderOverview();
+    // 如果目前在矩陣頁，也重新渲染
+    const active=document.querySelector('.panel.active');
+    if(active&&active.id==='panel-matrix') renderMatrix();
+    if(active&&active.id==='panel-deptprogress') renderDeptProgress();
     return true;
   }catch(e){
     console.error(e);
