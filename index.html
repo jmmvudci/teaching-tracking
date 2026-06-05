@@ -1386,11 +1386,13 @@ function removeDept(i){
 // ══════════════════════════════════════════
 async function apiGet(params){
   if(!G.cfg.apiUrl) return null;
-  const url=G.cfg.apiUrl+'?'+new URLSearchParams(params);
-  const r=await fetch(url, {redirect:'follow'});
+  // 加時間戳記避免快取
+  const p = Object.assign({}, params, {_t: Date.now()});
+  const url=G.cfg.apiUrl+'?'+new URLSearchParams(p);
+  const r=await fetch(url, {redirect:'follow', cache:'no-store'});
   const text=await r.text();
   try{ return JSON.parse(text); }
-  catch(e){ console.error('API parse error:', text.slice(0,200)); throw new Error('API回傳非JSON'); }
+  catch(e){ console.error('API parse error:', text.slice(0,200)); throw new Error('API回傳非JSON:'+text.slice(0,100)); }
 }
 
 // 所有寫入操作都用 GET + 編碼參數
