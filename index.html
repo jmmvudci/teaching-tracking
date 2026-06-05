@@ -1390,9 +1390,17 @@ function removeDept(i){
 // ══════════════════════════════════════════
 async function apiGet(params){
   if(!G.cfg.apiUrl) return null;
-  // 加時間戳記避免快取
-  const p = Object.assign({}, params, {_t: Date.now()});
-  const url=G.cfg.apiUrl+'?'+new URLSearchParams(p);
+  // 確保所有參數都是字串，避免物件被序列化成很長的字串
+  const safeParams = {};
+  for(const [k,v] of Object.entries(params)){
+    safeParams[k] = String(v);
+  }
+  safeParams._t = Date.now();
+  const url=G.cfg.apiUrl+'?'+new URLSearchParams(safeParams);
+  if(url.length > 8000){
+    console.error('URL too long:', url.length, 'params:', JSON.stringify(safeParams).slice(0,200));
+    throw new Error('請求參數太長（'+url.length+'字元），請聯絡系統管理員');
+  }
   const r=await fetch(url, {redirect:'follow', cache:'no-store'});
   const text=await r.text();
   try{ return JSON.parse(text); }
