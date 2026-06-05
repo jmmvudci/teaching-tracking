@@ -1483,12 +1483,42 @@ async function syncToAPI(){
 async function syncSettings(){
   if(!G.cfg.apiUrl){ toast('請先設定 API 網址'); return; }
   try{
-    const cfgStr=encodeURIComponent(JSON.stringify({
-      adminUser:G.cfg.adminUser, adminPass:G.cfg.adminPass,
-      managerCreds:G.cfg.managerCreds, deptCreds:G.cfg.deptCreds
-    }));
-    const r=await apiGet({action:'saveSettings', pass:G.cfg.adminPass, cfg:cfgStr});
-    if(r&&r.error) throw new Error(r.error);
+    // 只傳帳密設定，不傳其他資料
+    const settingsObj = {
+      adminUser: G.cfg.adminUser,
+      adminPass: G.cfg.adminPass,
+      managerCreds: G.cfg.managerCreds,
+      deptCreds: G.cfg.deptCreds
+    };
+    const cfgStr = encodeURIComponent(JSON.stringify(settingsObj));
+    // 如果太長就分批：先傳管理員，再傳職類
+    if(cfgStr.length > 3000){
+      // 先存管理員和副管理員
+      const adminOnly = {
+        adminUser: G.cfg.adminUser,
+        adminPass: G.cfg.adminPass,
+        managerCreds: G.cfg.managerCreds,
+        deptCreds: {}
+      };
+      await apiGet({action:'saveSettings', pass:G.cfg.adminPass, cfg:encodeURIComponent(JSON.stringify(adminOnly))});
+      // 再分批存職類帳密
+      const deptEntries = Object.entries(G.cfg.deptCreds||{});
+      const batchSize = 5;
+      for(let i=0; i<deptEntries.length; i+=batchSize){
+        const batch = Object.fromEntries(deptEntries.slice(i, i+batchSize));
+        const batchCfg = {
+          adminUser: G.cfg.adminUser,
+          adminPass: G.cfg.adminPass,
+          managerCreds: G.cfg.managerCreds,
+          deptCreds: batch,
+          mergeDeptCreds: true  // 告訴 API 要合併而不是覆蓋
+        };
+        await apiGet({action:'saveSettings', pass:G.cfg.adminPass, cfg:encodeURIComponent(JSON.stringify(batchCfg))});
+      }
+    } else {
+      const r=await apiGet({action:'saveSettings', pass:G.cfg.adminPass, cfg:cfgStr});
+      if(r&&r.error) throw new Error(r.error);
+    }
     toast('設定已同步至 Google Sheet');
   }catch(e){ toast('設定同步失敗：'+e.message); }
 }
