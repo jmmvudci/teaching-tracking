@@ -1382,23 +1382,19 @@ function removeDept(i){
 // ══════════════════════════════════════════
 
 // ══════════════════════════════════════════
-//  APPS SCRIPT API
+//  APPS SCRIPT API（全部用 GET，避免 CORS）
 // ══════════════════════════════════════════
 async function apiGet(params){
   if(!G.cfg.apiUrl) return null;
   const url=G.cfg.apiUrl+'?'+new URLSearchParams(params);
   const r=await fetch(url);
+  if(!r.ok) throw new Error('HTTP '+r.status);
   return r.json();
 }
 
-async function apiPost(body){
-  if(!G.cfg.apiUrl) return {error:'未設定 API 網址'};
-  const r=await fetch(G.cfg.apiUrl,{
-    method:'POST',
-    headers:{'Content-Type':'application/json'},
-    body:JSON.stringify(body)
-  });
-  return r.json();
+// 所有寫入操作都用 GET + 編碼參數
+async function apiCall(params){
+  return apiGet(params);
 }
 
 // 取得目前登入的密碼（用於 API 驗證）
@@ -1442,8 +1438,8 @@ async function pushStatus(itemId, dept, periodIdx, value){
   const pass=getCurrentPass();
   if(!pass){ toast('請先登入'); return; }
   try{
-    const r=await apiPost({action:'updateStatus', adminPass:pass, itemId, dept, periodIdx, value});
-    if(r.error) toast('同步失敗：'+r.error);
+    const r=await apiGet({action:'updateStatus', pass, itemId, dept, periodIdx, value});
+    if(r&&r.error) toast('同步失敗：'+r.error);
   }catch(e){ toast('網路錯誤：'+e.message); }
 }
 
@@ -1454,10 +1450,8 @@ async function syncToAPI(){
   btn.className='sync-btn saving'; btn.textContent='☁ 儲存中...';
   try{
     const pass=G.cfg.adminPass;
-    const r=await apiPost({
-      action:'write', adminPass:pass,
-      data:{ depts:G.depts, items:G.items, statusMap:G.statusMap }
-    });
+    const dataStr=encodeURIComponent(JSON.stringify({depts:G.depts, items:G.items, statusMap:G.statusMap}));
+    const r=await apiGet({action:'write', pass, data:dataStr});
     if(r.error) throw new Error(r.error);
     G.dirty=false;
     btn.className='sync-btn ok'; btn.textContent='✓ 已儲存';
@@ -1474,12 +1468,12 @@ async function syncToAPI(){
 async function syncSettings(){
   if(!G.cfg.apiUrl){ toast('請先設定 API 網址'); return; }
   try{
-    const r=await apiPost({
-      action:'saveSettings', adminPass:G.cfg.adminPass,
-      settings:{ adminUser:G.cfg.adminUser, adminPass:G.cfg.adminPass,
-                 managerCreds:G.cfg.managerCreds, deptCreds:G.cfg.deptCreds }
-    });
-    if(r.error) throw new Error(r.error);
+    const cfgStr=encodeURIComponent(JSON.stringify({
+      adminUser:G.cfg.adminUser, adminPass:G.cfg.adminPass,
+      managerCreds:G.cfg.managerCreds, deptCreds:G.cfg.deptCreds
+    }));
+    const r=await apiGet({action:'saveSettings', pass:G.cfg.adminPass, cfg:cfgStr});
+    if(r&&r.error) throw new Error(r.error);
     toast('設定已同步至 Google Sheet');
   }catch(e){ toast('設定同步失敗：'+e.message); }
 }
