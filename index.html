@@ -1195,13 +1195,15 @@ function setStatus(s){
     val=document.getElementById('spDateInput').value;
     if(!val){toast('請選擇日期');return;}
   }
-  G.statusMap[sk(_pc.itemId,_pc.dept,_pc.periodIdx)]=val;
+  // 先儲存 _pc 的值，因為 closePicker 會把 _pc 設為 null
+  const itemId=_pc.itemId, dept=_pc.dept, periodIdx=_pc.periodIdx;
+  G.statusMap[sk(itemId,dept,periodIdx)]=val;
   closePicker(); renderMatrix(); renderOverview();
   const lbl=val===0?'未完成':val==='done'?'已完成':val==='na'?'無學員':val==='reject'?'未符合':val===5?'已配合':val===3?'待確認':val===4?'異常':`${val} 完成`;
   toast(`已更新為「${lbl}」`);
   saveLocal();
   // 即時同步到 Google Sheet
-  pushStatus(_pc.itemId, _pc.dept, _pc.periodIdx, val);
+  pushStatus(itemId, dept, periodIdx, val);
 }
 
 // ══════════════════════════════════════════
