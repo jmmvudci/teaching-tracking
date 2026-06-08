@@ -754,7 +754,13 @@ function loadLocal(){
 // ══════════════════════════════════════════
 //  HELPERS
 // ══════════════════════════════════════════
-const sk = (id,dept,per) => per!==undefined ? `${id}-${dept}-${per}` : `${id}-${dept}`;
+// statusMap key 用項目名稱確保穩定，不受 id 變動影響
+const sk = (itemId, dept, per) => {
+  // itemId 可能是真正的 id，需要找對應的 name
+  const item = G.items.find(i=>i.id===itemId);
+  const key = item ? item.name : String(itemId);
+  return per!==undefined ? `${key}__${dept}__${per}` : `${key}__${dept}`;
+};
 const gs = (id,dept,per) => G.statusMap[sk(id,dept,per)] ?? 0;
 
 // ── PERIOD EXPANSION ──
@@ -1467,8 +1473,17 @@ async function fetchFromAPI(){
 async function pushStatus(itemId, dept, periodIdx, value){
   const pass=getCurrentPass();
   if(!pass){ toast('請先登入後再更新狀態'); return; }
+  // 找 item name 當穩定 key
+  const item=G.items.find(i=>i.id===itemId);
+  const itemName=item?item.name:String(itemId);
+  const key=`${itemName}__${dept}__${periodIdx||0}`;
   try{
-    const r=await apiGet({action:'updateStatus', pass, itemId:String(itemId), dept, periodIdx:String(periodIdx||0), value:String(value)});
+    const r=await apiGet({action:'updateStatus', pass,
+      itemId: key,  // 直接傳完整 key
+      dept:'__KEY__', // 標記這是完整 key
+      periodIdx:'0',
+      value:String(value)
+    });
     if(r&&r.error) toast('同步失敗：'+r.error);
   }catch(e){ toast('同步失敗：'+e.message); }
 }
