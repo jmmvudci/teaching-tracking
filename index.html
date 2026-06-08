@@ -1448,7 +1448,14 @@ async function fetchFromAPI(){
     }
     if(data.depts && data.depts.length) G.depts = data.depts;
     if(data.items) G.items = data.items;
-    if(data.statuses) G.statusMap = data.statuses;
+    if(data.statuses){
+      // 正規化 key：把全形底線替換成半形，確保一致
+      const normalized={};
+      for(const [k,v] of Object.entries(data.statuses)){
+        normalized[k.replace(/＿/g,'_')]=v;
+      }
+      G.statusMap=normalized;
+    }
     // 資料載入完成，重新渲染所有頁面
     updateAuthBadge();
     updateTopStatus();
