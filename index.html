@@ -801,6 +801,8 @@ function getEff(item, dept, periodIdx){
   if(raw==='overdue') return 'overdue';
   if(raw==='done' || (typeof raw==='string' && raw.match(/^\d{4}-\d{2}-\d{2}$/))) return raw;
   if(raw===5||raw===3||raw===4) return raw;
+  // na 和 reject 不受逾期影響
+  if(raw==='na' || raw==='reject') return raw;
   // auto overdue
   const periods = getItemPeriods(item);
   const period = periods[periodIdx] || periods[0];
