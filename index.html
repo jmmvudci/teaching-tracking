@@ -156,7 +156,7 @@ select{background:#fff;border:1px solid #e2e8f0;color:#2d3748;padding:6px 10px;b
 .hint{font-size:11px;color:#a0aec0;margin-top:3px;}
 
 /* STATUS PICKER */
-.sp-overlay{position:fixed;inset:0;z-index:300;background:transparent;}
+.sp-overlay{position:fixed;inset:0;z-index:300;background:transparent;cursor:default;}
 .sp-box{position:fixed;background:#fff;border:1px solid #e2e8f0;border-radius:var(--r-md);padding:8px;z-index:301;min-width:150px;box-shadow:0 8px 32px rgba(0,0,0,.15);}
 .sp-item{display:flex;align-items:center;padding:7px 10px;cursor:pointer;border-radius:var(--r-sm);}
 .sp-item:hover{background:#f7fafc;}
@@ -1175,6 +1175,7 @@ function openPickerAt(e, tdEl, itemId, dept, trackMode, isNotice, periodIdx=0){
       <div class="sp-item" onclick="setStatus(0)"><span class="spill s0">未完成</span></div>
       <div class="sp-item" onclick="setStatus('na')"><span class="spill sna">無學員</span></div>
       <div class="sp-item" onclick="setStatus('reject')"><span class="spill sreject">未符合</span></div>
+      <div class="sp-item" onclick="setStatus(3)"><span class="spill s3">待確認</span></div>
       <div style="padding:8px 10px;border-top:1px solid #f0f4f8;">
         <div style="font-size:11px;color:#4a5568;margin-bottom:5px;">填入完成日期</div>
         <div style="display:flex;gap:6px;align-items:center;">
@@ -1205,6 +1206,7 @@ function openPicker(e,itemId,dept,trackMode,isNotice,periodIdx=0){
   openPickerAt(e, e.currentTarget, itemId, dept, trackMode, isNotice, periodIdx);
 }
 function closePicker(){ document.getElementById('spBox').style.display='none'; document.getElementById('spOv').style.display='none'; _pc=null; }
+document.addEventListener('keydown',e=>{ if(e.key==='Escape') closePicker(); });
 function setStatus(s){
   if(!_pc)return;
   let val=s;
