@@ -1503,37 +1503,18 @@ async function syncToAPI(){
     // 先存 depts
     await apiGet({action:'write', pass, data:encodeURIComponent(JSON.stringify({depts:G.depts}))});
 
-    // items 智慧分批：盡量塞進同一批，但不超過 5000 字元
-    const MAX_LEN = 5000;
-    let batch = [], batchStart = 0, reqCount = 0;
-    const sendBatch = async(items, start) => {
-      reqCount++;
-      const total = G.items.length;
-      btn.textContent = `☁ 儲存中 ${Math.min(start+items.length, total)}/${total}...`;
-      await apiGet({action:'writeBatch', pass,
-        items: encodeURIComponent(JSON.stringify(items)),
-        batchStart: String(start),
-        total: String(total)
+    // items 用 POST 傳送（無 URL 長度限制）
+    const BATCH_SIZE = 8;
+    for(let i=0; i<G.items.length; i+=BATCH_SIZE){
+      const batch = G.items.slice(i, i+BATCH_SIZE);
+      btn.textContent = `☁ 儲存中 ${Math.min(i+BATCH_SIZE,G.items.length)}/${G.items.length}...`;
+      const r = await fetch(G.cfg.apiUrl, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({action:'writeBatch', pass, items:batch, batchStart:i})
       });
-    };
-
-    for(let i=0; i<G.items.length; i++){
-      batch.push(G.items[i]);
-      const testLen = encodeURIComponent(JSON.stringify(batch)).length;
-      if(testLen > MAX_LEN || i === G.items.length-1){
-        if(testLen > MAX_LEN && batch.length > 1){
-          // 最後一筆超限，先送前面的，再單獨送最後一筆
-          const last = batch.pop();
-          await sendBatch(batch, batchStart);
-          batchStart = i;
-          batch = [last];
-          if(i === G.items.length-1) await sendBatch(batch, batchStart);
-        } else {
-          await sendBatch(batch, batchStart);
-          batchStart = i+1;
-          batch = [];
-        }
-      }
+      const result = await r.json();
+      if(result && result.error) throw new Error(result.error);
     }
 
     G.dirty=false;
