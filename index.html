@@ -1481,21 +1481,21 @@ async function syncToAPI(){
   btn.className='sync-btn saving'; btn.textContent='☁ 儲存中...';
   try{
     const pass=isAdmin()?G.cfg.adminPass:G.cfg.managerCreds?.pass||'';
-    // 先存 depts
-    const deptsStr=encodeURIComponent(JSON.stringify({depts:G.depts}));
-    const r1=await apiGet({action:'write', pass, data:deptsStr});
-    if(r1&&r1.error) throw new Error(r1.error);
-    // items 分批存（每批 5 筆）
-    const batchSize=5;
-    for(let i=0;i<G.items.length;i+=batchSize){
-      const batch=G.items.slice(i,i+batchSize);
-      const batchStr=encodeURIComponent(JSON.stringify({
-        items:batch,
-        itemsBatch:true,
-        batchStart:i
-      }));
-      const r=await apiGet({action:'write', pass, data:batchStr});
-      if(r&&r.error) throw new Error(r.error);
+    // 先存 depts（短）
+    await apiGet({action:'write', pass, data:encodeURIComponent(JSON.stringify({depts:G.depts}))});
+    // items 每筆分開存
+    for(let i=0;i<G.items.length;i++){
+      const item=G.items[i];
+      await apiGet({action:'writeItem', pass,
+        id:String(item.id), name:item.name,
+        type:item.type, trackMode:item.trackMode||'simple',
+        freq:item.freq||'', column:item.column||'common',
+        temp:item.temp?'是':'否',
+        dateStart:item.dateStart||'', dateEnd:item.dateEnd||'',
+        depts:encodeURIComponent(item.depts.join('、')),
+        note:encodeURIComponent(item.note||''),
+        idx:String(i), total:String(G.items.length)
+      });
     }
     G.dirty=false;
     btn.className='sync-btn ok'; btn.textContent='✓ 已儲存';
