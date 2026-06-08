@@ -298,7 +298,15 @@ select{background:#fff;border:1px solid #e2e8f0;color:#2d3748;padding:6px 10px;b
 <div class="panel" id="panel-items">
   <div class="items-hdr">
     <h3 style="font-size:15px;font-weight:600;">追蹤項目管理</h3>
-    <button class="btn pri" onclick="openItemModal()">＋ 新增項目</button>
+    <div style="display:flex;gap:8px;align-items:center;">
+      <span class="tlabel">職類篩選</span>
+      <select id="itemGroupFilter" onchange="renderItems()">
+        <option value="all">全部</option>
+        <option value="doctor">👨‍⚕️ 醫師</option>
+        <option value="medical">🏥 醫事職類</option>
+      </select>
+      <button class="btn pri" onclick="openItemModal()">＋ 新增項目</button>
+    </div>
   </div>
   <div id="itemsSections"></div>
 </div>
@@ -910,11 +918,17 @@ function renderOverview(){
       for(const dp of i.depts){ if(sDone(getEff(i,dp,p.periodIdx)))pd++; }
       let dlabel,dcls,sortOrder;
       if(over){
-        dlabel=`逾期${Math.abs(dd)}天`;dcls='days-over';
-        sortOrder=Math.abs(dd); // 逾期排最前，逾期越久越前
+        if(pd===pt&&pt>0){
+          // 逾期但全部完成 → 排最後
+          dlabel=`逾期${Math.abs(dd)}天`;dcls='days-ok';
+          sortOrder=30000+Math.abs(dd);
+        } else {
+          dlabel=`逾期${Math.abs(dd)}天`;dcls='days-over';
+          sortOrder=Math.abs(dd); // 逾期未完成排最前
+        }
       } else if(notStarted){
         dlabel=`${daysDiff(p.dateStart)}天後開始`;dcls='days-ok';
-        sortOrder=20000+daysDiff(p.dateStart); // 未開始排最後
+        sortOrder=20000+daysDiff(p.dateStart);
       } else if(dd===0){
         dlabel='今日截止';dcls='days-warn';sortOrder=10000;
       } else if(dd<=3){
@@ -922,8 +936,8 @@ function renderOverview(){
       } else {
         dlabel=`還有${dd}天結束`;dcls='days-ok';sortOrder=10000+dd;
       }
-      const bc=over?'ub-over':isNoticeType?'ub-notice':'ub-submit';
-      const overStyle=over?'border-left:3px solid #e53e3e;background:#fff5f5;':'';
+      const bc=over&&!(pd===pt&&pt>0)?'ub-over':isNoticeType?'ub-notice':'ub-submit';
+      const overStyle=over&&!(pd===pt&&pt>0)?'border-left:3px solid #e53e3e;background:#fff5f5;':'';
       const col=i.column||'common';
       const pLabel=periods.length>1?` (${p.label})`:'';
       alertItems.push({col, sortOrder, html:`<div class="up-item" style="${overStyle}">
@@ -1212,17 +1226,40 @@ function setStatus(s){
 //  ITEMS
 // ══════════════════════════════════════════
 function renderItems(){
-  const submit=G.items.filter(i=>i.type!=='notice');
-  const notice=G.items.filter(i=>i.type==='notice');
+  const group=document.getElementById('itemGroupFilter')?.value||'all';
+  const filteredDepts=filterDepts(G.depts, group);
+  // 篩選：項目的職類有符合篩選群組的才顯示
+  const filterItem=item=>group==='all'||item.depts.some(d=>filteredDepts.includes(d));
+
+  // 排序：逾期未完成排前，已完成/逾期但完成排後
+  const sortItems=arr=>[...arr].sort((a,b)=>{
+    const aOver=isOverdue(a), bOver=isOverdue(b);
+    const {done:ad,total:at}=doneCount(a), {done:bd,total:bt}=doneCount(b);
+    const aDone=ad===at&&at>0, bDone=bd===bt&&bt>0;
+    // 逾期未完成排最前
+    if(aOver&&!aDone && !(bOver&&!bDone)) return -1;
+    if(bOver&&!bDone && !(aOver&&!aDone)) return 1;
+    // 已完成排最後
+    if(aDone && !bDone) return 1;
+    if(bDone && !aDone) return -1;
+    return 0;
+  });
+
+  const submit=sortItems(G.items.filter(i=>i.type!=='notice'&&filterItem(i)));
+  const notice=sortItems(G.items.filter(i=>i.type==='notice'&&filterItem(i)));
   let html='';
   const sec=(arr,label)=>{
     if(!arr.length)return '';
     return `<div><div class="sec-title">${label}</div><div class="ilist">
       ${arr.map(item=>{
         const over=isOverdue(item),active=isActive(item);
-        const tag=over?'<span style="font-size:10px;color:var(--red);margin-left:6px">逾期</span>':active?'<span style="font-size:10px;color:var(--green);margin-left:6px">進行中</span>':'';
         const {done:d,total:t}=doneCount(item);
-        return `<div class="irow ${item.type==='notice'?'notice-row':''}">
+        const allDone=d===t&&t>0;
+        const tag=over&&!allDone?'<span style="font-size:10px;color:#c53030;margin-left:6px;font-weight:700">逾期</span>':
+                  allDone?'<span style="font-size:10px;color:#276749;margin-left:6px">✓ 已完成</span>':
+                  active?'<span style="font-size:10px;color:#276749;margin-left:6px">進行中</span>':'';
+        const rowBorder=over&&!allDone?'border-left:3px solid #e53e3e':allDone?'border-left:3px solid #38a169':'';
+        return `<div class="irow ${item.type==='notice'?'notice-row':''}" style="${rowBorder}">
           <div class="iinfo">
             <div class="iname">${item.name}${item.temp?'<span class="tbadge tb-temp" style="margin-left:8px">臨時</span>':''}${item.freq?`<span class="tbadge tb-freq" style="margin-left:6px">🔁 ${{yearly:'每年',halfyear:'每半年',quarterly:'每季',monthly:'每月',irregular:'不定期'}[item.freq]||item.freq}</span>`:''}${tag}</div>
             <div class="imeta">📅 ${item.dateStart} ～ ${item.dateEnd}</div>
@@ -1239,7 +1276,7 @@ function renderItems(){
   };
   html+=sec(submit,'📋 繳交追蹤項目');
   html+=sec(notice,'📢 公告配合項目');
-  if(!G.items.length) html+='<div style="text-align:center;padding:60px;color:var(--text3)">尚無項目，點擊「新增項目」開始</div>';
+  if(!submit.length&&!notice.length) html+='<div style="text-align:center;padding:60px;color:#a0aec0">尚無項目，點擊「新增項目」開始</div>';
   document.getElementById('itemsSections').innerHTML=html;
 }
 function openItemModal(id=null){
