@@ -1481,27 +1481,47 @@ async function syncToAPI(){
   btn.className='sync-btn saving'; btn.textContent='☁ 儲存中...';
   try{
     const pass=isAdmin()?G.cfg.adminPass:G.cfg.managerCreds?.pass||'';
-    // 先存 depts（短）
+    // 先存 depts
     await apiGet({action:'write', pass, data:encodeURIComponent(JSON.stringify({depts:G.depts}))});
-    // items 每筆分開存
-    for(let i=0;i<G.items.length;i++){
-      const item=G.items[i];
-      await apiGet({action:'writeItem', pass,
-        id:String(item.id), name:item.name,
-        type:item.type, trackMode:item.trackMode||'simple',
-        freq:item.freq||'', column:item.column||'common',
-        temp:item.temp?'是':'否',
-        dateStart:item.dateStart||'', dateEnd:item.dateEnd||'',
-        depts:encodeURIComponent(item.depts.join('、')),
-        note:encodeURIComponent(item.note||''),
-        idx:String(i), total:String(G.items.length)
+
+    // items 智慧分批：盡量塞進同一批，但不超過 5000 字元
+    const MAX_LEN = 5000;
+    let batch = [], batchStart = 0, reqCount = 0;
+    const sendBatch = async(items, start) => {
+      reqCount++;
+      const total = G.items.length;
+      btn.textContent = `☁ 儲存中 ${Math.min(start+items.length, total)}/${total}...`;
+      await apiGet({action:'writeBatch', pass,
+        items: encodeURIComponent(JSON.stringify(items)),
+        batchStart: String(start),
+        total: String(total)
       });
+    };
+
+    for(let i=0; i<G.items.length; i++){
+      batch.push(G.items[i]);
+      const testLen = encodeURIComponent(JSON.stringify(batch)).length;
+      if(testLen > MAX_LEN || i === G.items.length-1){
+        if(testLen > MAX_LEN && batch.length > 1){
+          // 最後一筆超限，先送前面的，再單獨送最後一筆
+          const last = batch.pop();
+          await sendBatch(batch, batchStart);
+          batchStart = i;
+          batch = [last];
+          if(i === G.items.length-1) await sendBatch(batch, batchStart);
+        } else {
+          await sendBatch(batch, batchStart);
+          batchStart = i+1;
+          batch = [];
+        }
+      }
     }
+
     G.dirty=false;
     btn.className='sync-btn ok'; btn.textContent='✓ 已儲存';
     setTimeout(()=>{ btn.className='sync-btn'; btn.textContent='☁ 儲存'; },3000);
     saveLocal();
-    toast('已儲存至 Google Sheet');
+    toast(`已儲存至 Google Sheet（${reqCount} 次請求）`);
   }catch(e){
     btn.className='sync-btn'; btn.textContent='☁ 儲存';
     toast('儲存失敗：'+e.message);
