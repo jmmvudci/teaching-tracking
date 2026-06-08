@@ -1285,12 +1285,37 @@ function saveItem(){
   const data={name,type:document.getElementById('fType2').value,trackMode:document.getElementById('fTrackMode').value,freq:document.getElementById('fFreq').value,column:document.getElementById('fColumn').value||'common',temp:document.getElementById('fTemp').value==='1',dateStart:ds,dateEnd:de,depts,note:document.getElementById('fNote').value.trim()};
   if(G.editId){ const idx=G.items.findIndex(i=>i.id===G.editId); if(idx>=0)G.items[idx]={...G.items[idx],...data}; toast('已更新'); }
   else{ G.items.push({id:genId(),...data}); toast('已新增'); }
-  markDirty(); closeModal(); renderItems();
+  closeModal(); renderItems(); saveLocal();
+  // 立即同步所有 items（重建整個項目設定分頁）
+  syncItemsOnly();
 }
 function delItem(id){
   if(!confirm('確定刪除？'))return;
   G.items=G.items.filter(i=>i.id!==id);
-  markDirty(); renderItems(); toast('已刪除');
+  renderItems(); saveLocal(); toast('已刪除');
+  syncItemsOnly();
+}
+
+async function syncItemsOnly(){
+  if(!G.cfg.apiUrl) return;
+  const pass=isAdmin()?G.cfg.adminPass:G.cfg.managerCreds?.pass||'';
+  try{
+    // 每筆用 writeItem GET，資料短不會超限
+    for(let i=0;i<G.items.length;i++){
+      const item=G.items[i];
+      await apiGet({action:'writeItem', pass,
+        id:String(item.id), name:item.name,
+        type:item.type, trackMode:item.trackMode||'simple',
+        freq:item.freq||'', column:item.column||'common',
+        temp:item.temp?'是':'否',
+        dateStart:item.dateStart||'', dateEnd:item.dateEnd||'',
+        depts:encodeURIComponent(item.depts.join('、')),
+        note:encodeURIComponent(item.note||''),
+        idx:String(i), total:String(G.items.length)
+      });
+    }
+    toast('項目已同步至 Google Sheet');
+  }catch(e){ toast('同步失敗：'+e.message); }
 }
 
 // ══════════════════════════════════════════
@@ -1500,28 +1525,15 @@ async function syncToAPI(){
   btn.className='sync-btn saving'; btn.textContent='☁ 儲存中...';
   try{
     const pass=isAdmin()?G.cfg.adminPass:G.cfg.managerCreds?.pass||'';
-    // 先存 depts
-    await apiGet({action:'write', pass, data:encodeURIComponent(JSON.stringify({depts:G.depts}))});
-
-    // items 用 POST 傳送（無 URL 長度限制）
-    const BATCH_SIZE = 8;
-    for(let i=0; i<G.items.length; i+=BATCH_SIZE){
-      const batch = G.items.slice(i, i+BATCH_SIZE);
-      btn.textContent = `☁ 儲存中 ${Math.min(i+BATCH_SIZE,G.items.length)}/${G.items.length}...`;
-      const r = await fetch(G.cfg.apiUrl, {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({action:'writeBatch', pass, items:batch, batchStart:i})
-      });
-      const result = await r.json();
-      if(result && result.error) throw new Error(result.error);
-    }
-
+    // 只同步職類清單（短資料），items 由新增/修改/刪除時即時同步
+    const r=await apiGet({action:'write', pass,
+      data:encodeURIComponent(JSON.stringify({depts:G.depts}))});
+    if(r&&r.error) throw new Error(r.error);
     G.dirty=false;
     btn.className='sync-btn ok'; btn.textContent='✓ 已儲存';
     setTimeout(()=>{ btn.className='sync-btn'; btn.textContent='☁ 儲存'; },3000);
     saveLocal();
-    toast(`已儲存至 Google Sheet（${reqCount} 次請求）`);
+    toast('已儲存');
   }catch(e){
     btn.className='sync-btn'; btn.textContent='☁ 儲存';
     toast('儲存失敗：'+e.message);
