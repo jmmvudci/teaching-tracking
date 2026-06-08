@@ -1283,38 +1283,50 @@ function saveItem(){
   const depts=[...document.querySelectorAll('#deptCbs input:checked')].map(el=>el.value);
   if(!depts.length){toast('請選擇適用職類');return;}
   const data={name,type:document.getElementById('fType2').value,trackMode:document.getElementById('fTrackMode').value,freq:document.getElementById('fFreq').value,column:document.getElementById('fColumn').value||'common',temp:document.getElementById('fTemp').value==='1',dateStart:ds,dateEnd:de,depts,note:document.getElementById('fNote').value.trim()};
-  if(G.editId){ const idx=G.items.findIndex(i=>i.id===G.editId); if(idx>=0)G.items[idx]={...G.items[idx],...data}; toast('已更新'); }
-  else{ G.items.push({id:genId(),...data}); toast('已新增'); }
+  if(G.editId){ const idx=G.items.findIndex(i=>i.id===G.editId); if(idx>=0)G.items[idx]={...G.items[idx],...data}; toast('已更新'); syncItemsOnly(G.items[G.items.findIndex(i=>i.id===G.editId)]); }
+  else{ const newItem={id:genId(),...data}; G.items.push(newItem); toast('已新增'); syncItemsOnly(newItem); }
   closeModal(); renderItems(); saveLocal();
-  // 立即同步所有 items（重建整個項目設定分頁）
-  syncItemsOnly();
 }
 function delItem(id){
   if(!confirm('確定刪除？'))return;
   G.items=G.items.filter(i=>i.id!==id);
   renderItems(); saveLocal(); toast('已刪除');
-  syncItemsOnly();
+  syncItemsOnly(null); // 刪除後重建整個分頁
 }
 
-async function syncItemsOnly(){
+async function syncItemsOnly(changedItem){
   if(!G.cfg.apiUrl) return;
   const pass=isAdmin()?G.cfg.adminPass:G.cfg.managerCreds?.pass||'';
   try{
-    // 每筆用 writeItem GET，資料短不會超限
-    for(let i=0;i<G.items.length;i++){
-      const item=G.items[i];
+    if(changedItem){
+      // 只更新這一筆
+      const i=G.items.findIndex(it=>it.id===changedItem.id);
       await apiGet({action:'writeItem', pass,
-        id:String(item.id), name:item.name,
-        type:item.type, trackMode:item.trackMode||'simple',
-        freq:item.freq||'', column:item.column||'common',
-        temp:item.temp?'是':'否',
-        dateStart:item.dateStart||'', dateEnd:item.dateEnd||'',
-        depts:encodeURIComponent(item.depts.join('、')),
-        note:encodeURIComponent(item.note||''),
+        id:String(changedItem.id), name:changedItem.name,
+        type:changedItem.type, trackMode:changedItem.trackMode||'simple',
+        freq:changedItem.freq||'', column:changedItem.column||'common',
+        temp:changedItem.temp?'是':'否',
+        dateStart:changedItem.dateStart||'', dateEnd:changedItem.dateEnd||'',
+        depts:encodeURIComponent(changedItem.depts.join('、')),
+        note:encodeURIComponent(changedItem.note||''),
         idx:String(i), total:String(G.items.length)
       });
+    } else {
+      // 刪除後重建（只在刪除時呼叫，傳 null）
+      for(let i=0;i<G.items.length;i++){
+        const item=G.items[i];
+        await apiGet({action:'writeItem', pass,
+          id:String(item.id), name:item.name,
+          type:item.type, trackMode:item.trackMode||'simple',
+          freq:item.freq||'', column:item.column||'common',
+          temp:item.temp?'是':'否',
+          dateStart:item.dateStart||'', dateEnd:item.dateEnd||'',
+          depts:encodeURIComponent(item.depts.join('、')),
+          note:encodeURIComponent(item.note||''),
+          idx:String(i), total:String(G.items.length)
+        });
+      }
     }
-    toast('項目已同步至 Google Sheet');
   }catch(e){ toast('同步失敗：'+e.message); }
 }
 
